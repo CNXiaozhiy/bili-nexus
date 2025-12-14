@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>直播详情</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      @font-face {
+        font-family: "AaCute";
+        src: url("<%= FONT_PATH_AaCute %>") format("woff");
+      }
+
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 1000px;
+        min-height: 100vh;
+        background: linear-gradient(
+          135deg,
+          #0f0c29 0%,
+          #302b63 50%,
+          #24243e 100%
+        );
+        padding: 20px;
+      }
+
+      body * {
+        font-family: "AaCute", sans-serif !important;
+      }
+
+      .live-card {
+        width: 1000px;
+        height: 562px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 24px;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+        display: flex;
+        backdrop-filter: blur(15px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+      }
+
+      .background-image {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: url("<%= background_image %>");
+        background-size: cover;
+        background-position: center;
+        z-index: -1;
+        opacity: 0.7;
+        filter: brightness(0.8);
+      }
+
+      .background-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          135deg,
+          rgba(15, 12, 41, 0.85) 0%,
+          rgba(48, 43, 99, 0.8) 50%,
+          rgba(36, 36, 62, 0.85) 100%
+        );
+        z-index: -1;
+      }
+
+      .cover-section {
+        width: 50%;
+        height: 100%;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        padding: 30px;
+      }
+
+      .cover-container {
+        width: 100%;
+        height: 70%;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+        position: relative;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .cover-image {
+        width: 100%;
+        height: 100%;
+        background-image: url("<%= cover_image %>");
+        background-size: cover;
+        background-position: center;
+      }
+
+      .cover-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 40%;
+        background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+        display: flex;
+        align-items: flex-end;
+        padding: 20px;
+      }
+
+      .live-status {
+        display: flex;
+        align-items: center;
+        background: linear-gradient(90deg, #ff4b4b, #ff7676);
+        color: white;
+        padding: 8px 18px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: bold;
+        box-shadow: 0 4px 15px rgba(255, 75, 75, 0.4);
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 2;
+      }
+
+      /* 没有直播 */
+      .status-0 .live-status {
+        background: linear-gradient(90deg, #4facfe, #00f2fe);
+        box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+      }
+
+      .status-0 .accent-line {
+        background: linear-gradient(90deg, #4facfe, #00f2fe);
+      }
+
+      .status-0 .popularity-icon {
+        background: linear-gradient(135deg, #4facfe, #00f2fe);
+        box-shadow: 0 6px 15px rgba(79, 172, 254, 0.4);
+      }
+
+      /* 直播中 */
+      .status-1 .live-status {
+        background: linear-gradient(90deg, #ff4b4b, #ff7676);
+        box-shadow: 0 4px 15px rgba(255, 75, 75, 0.4);
+      }
+
+      .status-1 .accent-line {
+        background: linear-gradient(90deg, #ff4b4b, #ff7676);
+      }
+
+      .status-1 .popularity-icon {
+        background: linear-gradient(135deg, #ff4b4b, #ff7676);
+        box-shadow: 0 6px 15px rgba(255, 75, 75, 0.4);
+      }
+
+      /* 轮播中 */
+      .status-2 .live-status {
+        background: linear-gradient(90deg, #ffb347, #ffcc33);
+        box-shadow: 0 4px 15px rgba(255, 179, 71, 0.4);
+      }
+
+      .status-2 .accent-line {
+        background: linear-gradient(90deg, #ffb347, #ffcc33);
+      }
+
+      .status-2 .popularity-icon {
+        background: linear-gradient(135deg, #ffb347, #ffcc33);
+        box-shadow: 0 6px 15px rgba(255, 179, 71, 0.4);
+      }
+
+      /* 状态文字样式 */
+      .status-text-0::after {
+        content: "未开播";
+      }
+      .status-text-1::after {
+        content: "直播中";
+      }
+      .status-text-2::after {
+        content: "轮播中";
+      }
+
+      .live-dot {
+        width: 10px;
+        height: 10px;
+        background: white;
+        border-radius: 50%;
+        margin-right: 8px;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      .cover-time {
+        margin-top: 20px;
+        text-align: center;
+        padding: 18px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        width: 100%;
+      }
+
+      .cover-time-label {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 15px;
+        margin-bottom: 8px;
+      }
+
+      .cover-time-value {
+        color: white;
+        font-size: 18px;
+        font-weight: 500;
+      }
+
+      .info-section {
+        width: 50%;
+        height: 100%;
+        padding: 40px;
+        padding-bottom: 30px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .title {
+        font-size: 32px;
+        font-weight: bold;
+        color: white;
+        margin-bottom: 20px;
+        line-height: 1.3;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      }
+
+      .description {
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 18px;
+        margin-bottom: 25px;
+        line-height: 1.6;
+        max-height: 90px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-top: 30px;
+      }
+
+      .info-item {
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 15px 18px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        transition: all 0.3s ease;
+      }
+
+      .info-item:hover {
+        background: rgba(255, 255, 255, 0.12);
+        transform: translateY(-3px);
+      }
+
+      .info-label {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+
+      .info-value {
+        color: white;
+        font-size: 18px;
+        font-weight: 500;
+      }
+
+      .stats-container {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        margin-top: 20px;
+      }
+
+      .stats-container .stat-item {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        flex: 1;
+      }
+
+      .stats-container .stat-icon {
+        width: 50px;
+        height: 50px;
+        background: linear-gradient(135deg, #ff4b4b, #ff7676);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-right: 20px;
+        box-shadow: 0 6px 15px rgba(255, 75, 75, 0.4);
+      }
+
+      .stat-icon svg {
+        width: 24px;
+        height: 24px;
+        fill: white;
+      }
+
+      .stat-text {
+        color: white;
+      }
+
+      .stat-count {
+        font-size: 36px;
+        font-weight: bold;
+        line-height: 1;
+      }
+
+      .stat-label {
+        font-size: 16px;
+        color: rgba(255, 255, 255, 0.7);
+        margin-top: 5px;
+      }
+
+      .accent-line {
+        height: 4px;
+        width: 100px;
+        background: linear-gradient(90deg, #4facfe, #00f2fe);
+        border-radius: 2px;
+        margin-top: 15px;
+      }
+
+      .decorative-elements {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 200px;
+        height: 200px;
+        background: radial-gradient(
+          circle,
+          rgba(79, 172, 254, 0.2) 0%,
+          transparent 70%
+        );
+        z-index: -1;
+      }
+
+      .live-hash {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        color: rgba(255, 255, 255, 0.7);
+        /* background: rgba(0, 0, 0, 0.3);
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-family: monospace;
+        z-index: 10;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(5px);
+        max-width: 100px; */
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .live-hash-value {
+        font-size: 11px;
+        letter-spacing: 0.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="live-card status-<%= status %>">
+      <div class="background-image"></div>
+      <div class="background-overlay"></div>
+      <div class="decorative-elements"></div>
+
+      <div class="live-hash">
+        <!-- <div class="live-hash-label">直播ID</div> -->
+        <div class="live-hash-value"><%= liveHash %></div>
+      </div>
+
+      <div class="cover-section">
+        <div class="cover-container">
+          <div class="cover-image"></div>
+          <div class="cover-overlay"></div>
+          <div class="live-status">
+            <div class="live-dot"></div>
+            <span class="status-text-<%= status %>"></span>
+          </div>
+        </div>
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">主分区</div>
+            <div class="info-value"><%= parent_area_name %></div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">子分区</div>
+            <div class="info-value"><%= area_name %></div>
+          </div>
+        </div>
+
+        <div class="cover-time">
+          <div class="cover-time-label">开播时间</div>
+          <div class="cover-time-value"><%= live_time %></div>
+        </div>
+      </div>
+
+      <div class="info-section">
+        <div>
+          <h1 class="title"><%= title %></h1>
+          <p class="description"><%= description %></p>
+
+          <div class="accent-line"></div>
+        </div>
+
+        <div>
+          <div class="stats-container">
+            <div class="stat-item">
+              <div class="stat-icon">
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                  />
+                </svg>
+              </div>
+              <div class="stat-text">
+                <div class="stat-count"><%= popularity %></div>
+                <div class="stat-label">人气值</div>
+              </div>
+            </div>
+
+            <!-- <div class="stat-item">
+              <div class="stat-icon">
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
+                  />
+                </svg>
+              </div>
+              <div class="stat-text">
+                <div class="stat-count">11</div>
+                <div class="stat-label">在线人数</div>
+              </div>
+            </div> -->
+          </div>
+
+          <div class="cover-time">
+            <div class="cover-time-label">直播时长</div>
+            <div class="cover-time-value"><%= duration %></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const liveCard = document.querySelector(".live-card");
+        const liveDot = document.querySelector(".live-dot");
+
+        // 从live-card的类名中提取status值
+        const statusClass = Array.from(liveCard.classList).find((cls) =>
+          cls.startsWith("status-")
+        );
+        if (statusClass) {
+          const status = parseInt(statusClass.split("-")[1]);
+          if (status !== 1) {
+            liveDot.style.animation = "none";
+            liveDot.style.opacity = "0.7";
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

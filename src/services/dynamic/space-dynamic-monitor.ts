@@ -1,0 +1,74 @@
+import EventEmitter from "events";
+import BiliApiService from "../bili-api";
+import getLogger from "@/utils/logger";
+
+const logger = getLogger("SpaceDynamicMonitor");
+
+export interface SpaceDynamicMonitorOptions {
+  mid: number;
+  interval?: number;
+}
+
+export interface SpaceDynamicMonitorEvents {
+  new: [id: string];
+}
+
+export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonitorEvents> {
+  public readonly mid: number;
+  public interval: number;
+
+  private checkIntervalId?: NodeJS.Timeout;
+  private lastDynamicId: string = "";
+
+  constructor(options: SpaceDynamicMonitorOptions) {
+    super();
+    this.mid = options.mid;
+    this.interval = options.interval ?? 10000;
+  }
+
+  public async poll() {
+    try {
+      const { data: spaceDynamic } =
+        await BiliApiService.getDefaultInstance().getSpaceDynamic(
+          this.mid,
+          true
+        );
+      let item = spaceDynamic.items[0];
+      if (item.modules.module_tag && item.modules.module_tag.text === "置顶")
+        item = spaceDynamic.items[1];
+
+      const dynamicId = item.id_str;
+
+      if (!this.lastDynamicId) {
+        logger.info(`记录初始动态, ${this.mid} -> 的最新动态 ${dynamicId}`);
+      }
+
+      if (this.lastDynamicId && this.lastDynamicId !== dynamicId) {
+        logger.info(`检测到新动态, ${this.mid} ->  的最新动态 ${dynamicId}`);
+        this.emit("new", dynamicId);
+      }
+
+      this.lastDynamicId = dynamicId;
+    } catch (e) {}
+  }
+
+  public startMonitor() {
+    logger.info(`开始监控 ${this.mid} 的动态`);
+    this.poll();
+    this.checkIntervalId = setInterval(() => {
+      this.poll();
+    }, this.interval);
+  }
+
+  public stopMonitor() {
+    logger.info(`停止监控 ${this.mid} 的动态`);
+    if (this.checkIntervalId) {
+      clearInterval(this.checkIntervalId);
+    }
+  }
+
+  public destroy() {
+    this.stopMonitor();
+    this.removeAllListeners();
+  }
+}
