@@ -220,6 +220,15 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     });
   }
 
+  // 用于强制结束程序
+  public forceStopRecordAll() {
+    const promises: Promise<void>[] = [];
+    this.liveRecorders.forEach((recorder, hash) => {
+      promises.push(this.forceStopRecord(recorder, hash, false));
+    });
+    return Promise.all(promises);
+  }
+
   private installLiveMonitorEventListeners(
     liveMonitor: LiveMonitor,
     roomId: number,

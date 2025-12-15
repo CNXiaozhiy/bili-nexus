@@ -441,6 +441,26 @@ export default class QQBotService {
       return rooms.join(", ");
     });
 
+    this.commandProcessor.register(".blh.stop", async (args, context) => {
+      if (!Utils.auth(context.event.user_id, 20))
+        throw new AuthError("权限不足");
+
+      logger.warn("程序即将结束");
+
+      this.liveAutomationManager
+        .forceStopRecordAll()
+        .then(() => {
+          context.reply("所有任务已结束，程序已停止");
+          process.exit(0);
+        })
+        .catch(() => {
+          context.reply("所有任务结束失败，程序已停止");
+          process.exit(0);
+        });
+
+      return "正在结束所有录制任务";
+    });
+
     this.groupCommandProcessor.register("一键订阅", async (args, context) => {
       const oneClickSubscribe = canOneClickSubscribe(context.event.group_id);
       if (!oneClickSubscribe.can) {
