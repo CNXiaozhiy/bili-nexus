@@ -1,7 +1,11 @@
 import EventEmitter from "events";
 import LiveMonitor from "./live-monitor";
 import LiveRecorder from "./live-recorder";
-import { appConfigManager, biliConfigManager, liveConfigManager } from "@/common";
+import {
+  appConfigManager,
+  biliConfigManager,
+  liveConfigManager,
+} from "@/common";
 import BiliApiService from "../bili-api";
 import getLogger from "@/utils/logger";
 import { LiveRoomInfo, LiveRoomStatus, UserCard } from "@/types/bili";
@@ -36,7 +40,11 @@ export type UploadEventOptions = UploadOptions & { userCard: UserCard };
 export interface LiveAutomationManagerEvents {
   "new-monitor": [liveMonitor: LiveMonitor, roomId: number];
   "new-recorder": [liveRecorder: LiveRecorder, hash: string];
-  "new-uploader": [videoUploader: VideoUploader, hash: string, uploadEventOptions: UploadEventOptions];
+  "new-uploader": [
+    videoUploader: VideoUploader,
+    hash: string,
+    uploadEventOptions: UploadEventOptions
+  ];
   "remove-room": [roomId: number];
 }
 
@@ -47,12 +55,15 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
   public liveMonitors: Map<number, LiveMonitor> = new Map(); // RoomId -> LiveMonitor
   public liveRecorders: Map<string, LiveRecorder> = new Map(); // Hash -> LiveRecorder
   public videoUploaders: Map<string, VideoUploader> = new Map(); // Hash -> VideoUploader
-  public diskSpaceMonitor: DiskSpaceMonitor = new DiskSpaceMonitor(appConfigManager.get("recordingDir"), {
-    checkInterval: 30000,
-    lowSpaceThreshold: 10 * 1024 * 1024 * 1024, // 10GB
-    criticalSpaceThreshold: 5 * 1024 * 1024 * 1024, // 5GB
-    fatalSpaceThreshold: 100 * 1024 * 1024, // 100MB
-  });
+  public diskSpaceMonitor: DiskSpaceMonitor = new DiskSpaceMonitor(
+    appConfigManager.get("recordingDir"),
+    {
+      checkInterval: 30000,
+      lowSpaceThreshold: 10 * 1024 * 1024 * 1024, // 10GB
+      criticalSpaceThreshold: 5 * 1024 * 1024 * 1024, // 5GB
+      fatalSpaceThreshold: 100 * 1024 * 1024, // 100MB
+    }
+  );
 
   private recordTimeouts = new Map<string, NodeJS.Timeout>(); // Hash -> Timeout
 
@@ -101,7 +112,10 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
       const taskCount = taskMap.size;
       if (taskCount === 0) {
-        notifyEmitter.emit("msg-warn", "严重警告: 磁盘空间不足，且当前无录制任务，请立即检查磁盘状态！");
+        notifyEmitter.emit(
+          "msg-warn",
+          "严重警告: 磁盘空间不足，且当前无录制任务，请立即检查磁盘状态！"
+        );
         logger.error("磁盘空间不足，且当前无录制任务，请立即检查磁盘状态");
         return;
       }
@@ -112,20 +126,20 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       const allHashes = Array.from(this.liveRecorders.keys());
       const shuffledHashes = allHashes.sort(() => 0.5 - Math.random());
 
-      const hashesToStop = shuffledHashes.slice(0, Math.min(randomTaskCount, allHashes.length));
+      const hashesToStop = shuffledHashes.slice(
+        0,
+        Math.min(randomTaskCount, allHashes.length)
+      );
 
       hashesToStop.forEach((hash) => {
         const recorder = this.liveRecorders.get(hash);
         logger.info(`开始停止任务 -> ${hash}`);
         if (recorder) {
-          this.waitingForRestartRecordTask.add(hash);
-          logger.info(`任务 ${hash} 已放入等待区`);
           this.forceStopRecord(recorder, hash)
             .then(() => {
               logger.info(`停止任务 ${hash} -> 成功`);
             })
             .catch((e) => {
-              this.waitingForRestartRecordTask.delete(hash);
               logger.error(`停止任务 ${hash} -> 失败,`, e);
               logger.warn(`停止录制任务失败, 则这个任务仍会继续运行`);
             });
@@ -167,19 +181,25 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       } else {
         logger.info(`房间 ${roomId} 准备录制`);
       }
-      const inputUrls = await BiliApiService.getDefaultInstance().getLiveStreamUrl(roomId);
+      const inputUrls =
+        await BiliApiService.getDefaultInstance().getLiveStreamUrl(roomId);
       const inputUrl = inputUrls[0];
-      const recorder = new LiveRecorder(hash, inputUrl, appConfigManager.get("recordingDir"));
+      const recorder = new LiveRecorder(
+        hash,
+        inputUrl,
+        appConfigManager.get("recordingDir")
+      );
       this.recordTimeouts.set(
         hash,
         setTimeout(() => {
-          logger.warn(`录制任务 ${hash} 超过最大录制时长限制, 尝试强制停止录制任务`);
+          logger.warn(
+            `录制任务 ${hash} 超过最大录制时长限制, 尝试强制停止录制任务`
+          );
           this.forceStopRecord(recorder, hash)
             .then(() => {
               logger.info(`停止任务 ${hash} -> 成功`);
             })
             .catch((e) => {
-              this.waitingForRestartRecordTask.delete(hash);
               logger.error(`停止任务 ${hash} -> 失败,`, e);
               logger.warn(`停止录制任务失败, 则这个任务仍会继续运行`);
             });
@@ -188,12 +208,16 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
       recorder.on("end", () => {
         liveMonitor.poll().then((status) => {
-          logger.info(`收到 LiveRecorder(${hash}) 录制完成 事件, 开始检查是否未异常结束`);
+          logger.info(
+            `收到 LiveRecorder(${hash}) 录制完成 事件, 开始检查是否未异常结束`
+          );
           if (status === LiveRoomStatus.LIVE) {
             logger.info(`${hash} 录制为异常结束`);
             recorder.retryRecord();
           } else {
-            logger.debug(`${hash} 录制为正常结束, 由liveMonitor的live-end事件Handler处理剩余事务`);
+            logger.debug(
+              `${hash} 录制为正常结束, 由liveMonitor的live-end事件Handler处理剩余事务`
+            );
           }
         });
       });
@@ -229,13 +253,15 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       }
 
       if (this.recordTimeouts.has(hash)) {
-        logger.debug(`清理录制超时计时器, hash:`, hash)
+        logger.debug(`清理录制超时计时器, hash:`, hash);
         clearTimeout(this.recordTimeouts.get(hash)!);
         this.recordTimeouts.delete(hash);
       }
 
       if (this.waitingForRestartRecordTask.delete(hash)) {
-        logger.warn(`本场直播 ${hash} 仍位于等待重启的投稿任务中, 将放弃剩余事务`);
+        logger.warn(
+          `本场直播 ${hash} 仍位于等待重启的投稿任务中, 将放弃剩余事务`
+        );
         logger.debug(`由于直播已结束, 删除等待重启的投稿任务 -> ${hash}`);
 
         const recorder = this.liveRecorders.get(hash);
@@ -254,10 +280,14 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
       const recorder = this.liveRecorders.get(hash);
       if (!recorder) {
-        logger.debug(`未找到 ${hash} 的录制器, liveMonitor.event.live-end's Handler -> 放弃剩余事务`);
+        logger.debug(
+          `未找到 ${hash} 的录制器, liveMonitor.event.live-end's Handler -> 放弃剩余事务`
+        );
         return;
       }
-      logger.info(`房间 ${roomId} 开始停止录制, ${hash} 录制器 -> stopRecord()`);
+      logger.info(
+        `房间 ${roomId} 开始停止录制, ${hash} 录制器 -> stopRecord()`
+      );
 
       if (!recorder.isRunning()) {
         logger.debug(`WARN: ${hash} 的录制器未在录制`);
@@ -265,7 +295,8 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
       const resp = await recorder.stopRecordAndMerge();
 
-      const customOptions = liveConfigManager.get("rooms")[roomId]?.uploadOptions;
+      const customOptions =
+        liveConfigManager.get("rooms")[roomId]?.uploadOptions;
 
       if (roomManageOptions.autoUpload) {
         logger.info(`房间 ${roomId} 开始自动投稿`);
@@ -292,13 +323,19 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
       recorder.destroy();
       this.liveRecorders.delete(hash);
+      this.hashToRoomIdMap.delete(hash);
 
       // Recorder 的生命结束
       logger.debug(`录制器 ${hash} 的生命结束，已从 liveRecorders 移除`);
+      logger.debug(`录制器 ${hash} 的生命结束，映射已从 hashToRoomIdMap 移除`);
     });
 
     liveMonitor.on("status-change", (roomInfo) => {
-      logger.info(`房间 ${roomId} 状态变化 -> ${BiliUtils.transformLiveStatus(roomInfo.live_status)}`);
+      logger.info(
+        `房间 ${roomId} 状态变化 -> ${BiliUtils.transformLiveStatus(
+          roomInfo.live_status
+        )}`
+      );
     });
 
     logger.debug(`liveMonitor.startMonitor -> ${roomId}`);
@@ -347,7 +384,9 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
   private async upload(options: UploadOptions) {
     const { hash, file, roomInfo, live, recorder, customOptions } = options;
     logger.debug(`采用投稿账号 -> ${customOptions?.account || "默认账号"}`);
-    const biliApiInstance = customOptions?.account ? BiliApiService.getInstance(customOptions.account) : BiliApiService.getDefaultInstance();
+    const biliApiInstance = customOptions?.account
+      ? BiliApiService.getInstance(customOptions.account)
+      : BiliApiService.getDefaultInstance();
     const userCard = await biliApiInstance.getUserCard(roomInfo.uid);
     const userName = userCard.card.name; // UP主 名字
 
@@ -361,12 +400,28 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       `UP主: ${userName}\n` +
       `https://space.bilibili.com/${roomInfo.uid}\n\n` +
       `场次: ${session}\n` +
-      `开播时间: ${live.startTime ? FormatUtils.formatDateTime(live.startTime) : "未知"}\n` +
-      `结束直播: ${live.stopTime ? FormatUtils.formatDateTime(live.stopTime) : "未知"}\n` +
-      `直播时长: ${FormatUtils.formatDurationWithoutSeconds(live.duration)}\n\n` +
-      `开始录制: ${recorder.startTime ? FormatUtils.formatDateTime(recorder.startTime) : "未知"}\n` +
-      `结束录制: ${recorder.stopTime ? FormatUtils.formatDateTime(recorder.stopTime) : "未知"}\n` +
-      `录制时长: ${FormatUtils.formatDurationWithoutSeconds(recorder.duration)}\n\n` +
+      `开播时间: ${
+        live.startTime ? FormatUtils.formatDateTime(live.startTime) : "未知"
+      }\n` +
+      `结束直播: ${
+        live.stopTime ? FormatUtils.formatDateTime(live.stopTime) : "未知"
+      }\n` +
+      `直播时长: ${FormatUtils.formatDurationWithoutSeconds(
+        live.duration
+      )}\n\n` +
+      `开始录制: ${
+        recorder.startTime
+          ? FormatUtils.formatDateTime(recorder.startTime)
+          : "未知"
+      }\n` +
+      `结束录制: ${
+        recorder.stopTime
+          ? FormatUtils.formatDateTime(recorder.stopTime)
+          : "未知"
+      }\n` +
+      `录制时长: ${FormatUtils.formatDurationWithoutSeconds(
+        recorder.duration
+      )}\n\n` +
       `直播间标题: ${roomInfo.title}\n` +
       `直播间简介: ${roomInfo.description || "无"}\n` +
       `直播间地址: https://live.bilibili.com/${roomInfo.room_id}\n` +
@@ -397,17 +452,19 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     });
 
     const resp = await uploader.upload();
-
-    try {
-      fs.unlinkSync(file);
-      logger.info("清理录制文件成功 ✅ ->", file);
-    } catch (e) {
-      logger.error("删除录制文件失败 ->", e);
-    }
     return resp;
   }
 
-  private async forceStopRecord(recorder: LiveRecorder, hash: string) {
+  private async forceStopRecord(
+    recorder: LiveRecorder,
+    hash: string,
+    allowRestart = true
+  ) {
+    if (allowRestart) {
+      this.waitingForRestartRecordTask.add(hash);
+      logger.info(`任务 ${hash} 已放入等待区`);
+    }
+
     const roomId = this.hashToRoomIdMap.get(hash);
 
     let shouldUpload = false;
@@ -418,58 +475,78 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       throw new Error(`强制停止时通过映射获取房间号失败, hash: ${hash}`);
     }
 
-    const liveRoomConfig = liveConfigManager.get("rooms");
-    const roomConfig = liveRoomConfig[roomId];
-
     try {
-      if (!roomConfig) throw new Error(`未找到房间 ${roomId} 的配置文件`);
-      if (typeof roomConfig.autoUpload !== "boolean") throw new Error(`房间 ${roomId} 的配置文件可以已经损坏, autoUpload 非逻辑值`);
-      shouldUpload = roomConfig.autoUpload;
-    } catch (e) {
-      logger.error((e as Error).message);
-    }
+      const liveRoomConfig = liveConfigManager.get("rooms");
+      const roomConfig = liveRoomConfig[roomId];
 
-    if (shouldUpload) {
-      const resp = await recorder.stopRecordAndMerge();
-      // 手动获取直播间信息
-      const roomInfo = await BiliApiService.getDefaultInstance().getLiveRoomInfo(roomId);
+      try {
+        if (!roomConfig) throw new Error(`未找到房间 ${roomId} 的配置文件`);
+        if (typeof roomConfig.autoUpload !== "boolean")
+          throw new Error(
+            `房间 ${roomId} 的配置文件可以已经损坏, autoUpload 非逻辑值`
+          );
+        shouldUpload = roomConfig.autoUpload;
+      } catch (e) {
+        logger.error((e as Error).message);
+      }
 
-      const liveStartTime = new Date(roomInfo.live_time).getTime();
+      if (shouldUpload) {
+        const resp = await recorder.stopRecordAndMerge();
+        // 手动获取直播间信息
+        const roomInfo =
+          await BiliApiService.getDefaultInstance().getLiveRoomInfo(roomId);
 
-      logger.info(`${hash}录像 开始投稿`);
-      const uploadResp = await this.upload({
-        hash,
-        file: resp.file,
-        roomInfo,
-        live: {
-          startTime: liveStartTime,
-          stopTime: 0,
-          duration: 0,
-        },
-        recorder: {
-          startTime: resp.startTime,
-          stopTime: resp.stopTime,
-          duration: resp.duration,
-        },
-        additionalDesc: "注意: 本次录像存在被异常终止情况",
-        customOptions: roomConfig?.uploadOptions,
-      });
-      logger.info("视频投稿成功", uploadResp);
+        const liveStartTime = new Date(roomInfo.live_time).getTime();
 
-      // 重置录制器，如要删除请在录制结束后删除
-      await recorder.reset(true);
-    } else {
-      logger.info(`即将删除录像文件, 并不投稿`);
-      const resp = await recorder.stopRecord();
-      for (let file of resp.segmentFiles) {
-        logger.debug(`delete file -> ${file}`);
-        try {
-          fs.unlinkSync(file);
-          logger.info(`删除文件成功 -> ${file}`);
-        } catch (e) {
-          logger.error(`删除录像文件失败 ->`, e);
+        logger.info(`${hash}录像 开始投稿`);
+        const uploadResp = await this.upload({
+          hash,
+          file: resp.file,
+          roomInfo,
+          live: {
+            startTime: liveStartTime,
+            stopTime: 0,
+            duration: 0,
+          },
+          recorder: {
+            startTime: resp.startTime,
+            stopTime: resp.stopTime,
+            duration: resp.duration,
+          },
+          additionalDesc: "注意: 本次录像存在被异常终止情况",
+          customOptions: roomConfig?.uploadOptions,
+        });
+        logger.info("视频投稿成功", uploadResp);
+
+        if (allowRestart) {
+          // 重置录制器，如要删除请在录制结束后删除
+          await recorder.reset(true);
+          logger.info(`强制停止允许 allowRestart，已 reset 录制器`);
+        } else {
+          recorder.destroy(true);
+          this.liveRecorders.delete(hash);
+          this.hashToRoomIdMap.delete(hash);
+          logger.debug("强制停止禁用 allowRestart，已清理录制器");
+        }
+      } else {
+        logger.info(`即将删除录像文件, 并不投稿`);
+        const resp = await recorder.stopRecord();
+        for (let file of resp.segmentFiles) {
+          logger.debug(`delete file -> ${file}`);
+          try {
+            fs.unlinkSync(file);
+            logger.info(`删除文件成功 -> ${file}`);
+          } catch (e) {
+            logger.error(`删除录像文件失败 ->`, e);
+          }
         }
       }
+    } catch (e) {
+      if (allowRestart) {
+        this.waitingForRestartRecordTask.delete(hash);
+        logger.info(`强制停止任务失败，任务 ${hash} 已移出等待区`);
+      }
+      throw e;
     }
   }
 

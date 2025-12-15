@@ -222,12 +222,12 @@ export default class VideoUploader extends EventEmitter<{
 
                 task.process(`${i + 1}/${totalChunks}`);
 
-                logger.info(
-                  `投稿器[${this.name}] -> 视频[${iVideo}] 分片[${
-                    i + 1
-                  }/${totalChunks}] 上传 ->`,
-                  resp
-                );
+                // logger.info(
+                //   `投稿器[${this.name}] -> 视频[${iVideo}] 分片[${
+                //     i + 1
+                //   }/${totalChunks}] 上传 ->`,
+                //   resp
+                // );
               } catch (e: any) {
                 logger.error(
                   `投稿器[${this.name}] -> 视频[${iVideo}] 分片[${
