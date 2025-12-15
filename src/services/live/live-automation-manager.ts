@@ -605,10 +605,31 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
   }
 
   private clearRecording(hash: string, deleteFile = false) {
-    this.liveRecorders.get(hash)?.destroy(deleteFile);
-    this.liveRecorders.delete(hash);
-    this.hashToRoomIdMap.delete(hash);
-    this.waitingForRestartRecordTask.delete(hash);
+    logger.debug(`开始清理录制记录 -> ${hash}`);
+
+    if (this.liveRecorders.has(hash)) {
+      logger.debug(`已开始销毁录制器 -> ${hash}`);
+      this.liveRecorders.get(hash)?.destroy(deleteFile);
+
+      logger.debug(`已从录制器组中删除录制器 -> ${hash}`);
+      this.liveRecorders.delete(hash);
+    } else {
+      logger.warn(`录制器组中无此录制器 -> ${hash}`);
+    }
+
+    if (this.hashToRoomIdMap.has(hash)) {
+      logger.debug(
+        `已删除 Hash -> RoomId 映射: ${hash} -> ${this.hashToRoomIdMap.get(
+          hash
+        )}`
+      );
+      this.hashToRoomIdMap.delete(hash);
+    }
+
+    if (this.waitingForRestartRecordTask.has(hash)) {
+      logger.debug(`已从等待队列中删除录制器 -> ${hash}`);
+      this.waitingForRestartRecordTask.delete(hash);
+    }
   }
 
   public getLiveMonitors() {
