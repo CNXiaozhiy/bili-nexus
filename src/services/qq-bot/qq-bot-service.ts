@@ -1250,8 +1250,11 @@ export default class QQBotService {
               });
 
           await this.bot.sendGroup(gid, [
-            OneBotMessageUtils.Text("您订阅的直播间开始直播啦\n"),
             OneBotMessageUtils.Base64Image(base64),
+          ]);
+
+          await this.bot.sendGroup(gid, [
+            OneBotMessageUtils.Text("您订阅的直播间开始直播啦\n"),
             ...atSegmentMessage,
           ]);
 
@@ -1294,9 +1297,13 @@ export default class QQBotService {
               logger.error("机器人实例对象不存在！");
               return;
             }
+
             await this.bot.sendGroup(parseInt(gid), [
-              OneBotMessageUtils.Text("您订阅的直播间已经结束直播啦\n\n"),
               OneBotMessageUtils.Base64Image(base64),
+            ]);
+
+            await this.bot.sendGroup(parseInt(gid), [
+              OneBotMessageUtils.Text("您订阅的直播间已经结束直播啦"),
             ]);
 
             logger.debug(`群聊通知完成 -> Group ${gid}`);
@@ -1389,8 +1396,23 @@ export default class QQBotService {
           ),
         ]);
 
+        if (
+          Math.floor(Date.now() / 1000) -
+            parseInt(dynamic.modules.module_author.pub_ts as any) >
+          60 * 60
+        ) {
+          logger.warn(
+            `动态过久，停止通知 :`,
+            Math.floor(Date.now() / 1000) -
+              parseInt(dynamic.modules.module_author.pub_ts as any)
+          );
+          return;
+        }
+
         await this.bot.sendGroup(gid, [
-          OneBotMessageUtils.Text("UP发布新动态啦 "),
+          OneBotMessageUtils.Text(
+            `UP发布新动态啦\n发布时间: ${dynamic.modules.module_author.pub_time}`
+          ),
           ...atSegmentMessage,
         ]);
 

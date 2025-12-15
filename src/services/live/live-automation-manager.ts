@@ -471,9 +471,11 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       `结束直播: ${
         live.stopTime ? FormatUtils.formatDateTime(live.stopTime) : "未知"
       }\n` +
-      `直播时长: ${FormatUtils.formatDurationWithoutSeconds(
+      `直播时长: ${
         live.duration
-      )}\n\n` +
+          ? FormatUtils.formatDurationWithoutSeconds(live.duration)
+          : "未知"
+      }\n\n` +
       `开始录制: ${
         recorder.startTime
           ? FormatUtils.formatDateTime(recorder.startTime)
@@ -484,16 +486,18 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
           ? FormatUtils.formatDateTime(recorder.stopTime)
           : "未知"
       }\n` +
-      `录制时长: ${FormatUtils.formatDurationWithoutSeconds(
+      `录制时长: ${
         recorder.duration
-      )}\n\n` +
+          ? FormatUtils.formatDurationWithoutSeconds(recorder.duration)
+          : "未知"
+      }\n\n` +
       `直播间标题: ${roomInfo.title}\n` +
       `直播间简介: ${roomInfo.description || "无"}\n` +
       `直播间地址: https://live.bilibili.com/${roomInfo.room_id}\n` +
       `侵权请私信\n\n` +
       (options.additionalDesc ? `${options.additionalDesc}\n\n` : "") +
       `本场直播 Hash: ${hash.substring(0, 7)}\n` +
-      `由 Bili-Live-Hub v${getVersion()} 系统全自动录制`;
+      `由 Bili-Nexus v${getVersion()} 系统全自动录制`;
 
     const uploader = new VideoUploader(hash.substring(0, 7), biliApiInstance, {
       videos: [{ filePath: file, title: "", desc: "" }],

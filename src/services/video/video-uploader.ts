@@ -144,11 +144,7 @@ export default class VideoUploader extends EventEmitter<{
 
         task.success();
 
-        logger.info(
-          `投稿器[${this.name}] -> 视频[${iVideo}] 预上传完成, ${JSON.stringify(
-            preuploadResp
-          )}`
-        );
+        logger.info(`投稿器[${this.name}] -> 视频[${iVideo}] 预上传完成`);
 
         // 整理信息
         const {
@@ -319,7 +315,7 @@ export default class VideoUploader extends EventEmitter<{
 
       task.success();
 
-      logger.info(`投稿器[${this.name}] -> 视频 投稿完成 -> ${resp}`);
+      logger.info(`投稿器[${this.name}] -> 视频 投稿完成 ->`, resp);
 
       if (videoInfo.season) {
         task = pushTask("添加至合集");
