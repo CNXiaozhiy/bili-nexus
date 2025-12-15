@@ -14,7 +14,7 @@ import FormatUtils from "@/utils/format";
 const logger = getLogger("LiveRecorder");
 
 export interface LiveRecorderEvents {
-  start: [void];
+  start: [isFirst: boolean];
   progress: [stats: FfmpegStats];
   end: [duration: number];
   err: [error: Error];
@@ -99,11 +99,13 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
 
   public startRecord() {
     this._checkIfDestroyed();
+    const isFirst = this.startTime === 0;
 
-    if (this.startTime === 0) {
+    if (isFirst) {
       logger.debug(`第一次录制开始, startTime 将被设置`);
       this.startTime = Date.now();
     }
+
     const filePath = this.generateNewFilePath(this.getSegmentFilesCount());
     this.segmentFiles.push({ filePath, start: Date.now() });
     this.recFfmpeg = Ffmpeg.createRecordingCommand(this.inputUrl, filePath, {
@@ -118,6 +120,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
       this.ffmpegRunning = true;
       this.retryCount = 0;
       logger.info(`${this.hash} 分段[${this.getSegIndex()}] -> 开始录制`);
+      this.emit("start", isFirst);
     });
 
     this.recFfmpeg.on("progress", (stats: FfmpegStats) => {
@@ -240,22 +243,24 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     }
 
     return await new Promise((resolve, reject) => {
+      logger.info("开始合并分段", resp.segmentFiles);
+
       const concatFfmpeg = Ffmpeg.createConcatCommand(
         resp.segmentFiles,
         this.generateNewFilePath("merge")
       );
 
-      concatFfmpeg.on("start", () => {
+      concatFfmpeg.once("start", () => {
         logger.info(`concatFfmpeg 开始合并任务`);
       });
 
-      concatFfmpeg.on("exit", (code, signal) => {
+      concatFfmpeg.once("exit", (code, signal) => {
         logger.debug(`concatFfmpeg 退出, code: ${code}, signal: ${signal}`);
       });
 
-      concatFfmpeg.on("err", reject);
+      concatFfmpeg.once("err", reject);
 
-      concatFfmpeg.on("done", (outputPath) => {
+      concatFfmpeg.once("done", (outputPath) => {
         logger.info("合并文件完成，开始清理文件");
 
         this.segmentFiles.forEach(({ filePath }) => {
@@ -359,19 +364,18 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     this._checkIfDestroyed();
 
     logger.info("开始重置当前录制器");
-    const resp = await this.stopRecord();
+    await this.stopRecord();
+
     if (deleteFile) {
       logger.info("开始删除录像文件");
-      resp.segmentFiles.forEach((file, index) => {
+      this.segmentFiles.forEach(({ filePath }, index) => {
         try {
-          fs.unlinkSync(file);
-          logger.info(`删除录制文件 ${file} 成功 ✅`);
+          fs.unlinkSync(filePath);
+          logger.info(`删除录制文件 ${filePath} 成功 ✅`);
         } catch (e) {
-          logger.error(`删除录像文件 ${file} 失败 ❌ ->`, e);
+          logger.error(`删除录像文件 ${filePath} 失败 ❌ ->`, e);
         }
       });
-
-      resp.segmentFiles = [];
     }
 
     this.segmentFiles = [];
