@@ -10,6 +10,7 @@ import {
 } from "@/types/errors/live-recorder";
 import path from "path";
 import FormatUtils from "@/utils/format";
+import TimeUtils from "@/utils/time";
 
 const logger = getLogger("LiveRecorder");
 
@@ -149,7 +150,6 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
 
     this.recFfmpeg.once("done", async (outputPath, stats) => {
       logger.info(`${this.hash} -> ffmpeg 录制结束`);
-      this.duration += stats.duration;
       this.emit("end", this.duration);
     });
 
@@ -176,6 +176,26 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     }>((resolve, reject) => {
       const _stop = () => {
         logger.debug(`录制 _stop -> 结束`);
+
+        if (this.ffmpegStats && this.ffmpegStats.time) {
+          this.duration += TimeUtils.parseTimeToMsRegex(this.ffmpegStats.time);
+          logger.info(
+            `录制时长: ${FormatUtils.formatDurationWithoutSeconds(
+              this.duration
+            )}`
+          );
+        } else {
+          logger.warn(
+            "获取上个分段录制时长失败, 将使用函数调用时间差作为时长, stats:",
+            this.ffmpegStats
+          );
+          this.duration += this.stopTime - this.startTime;
+          logger.info(
+            `录制时长: ${FormatUtils.formatDurationWithoutSeconds(
+              this.duration
+            )}`
+          );
+        }
 
         this.recFfmpeg = null;
         this.ffmpegRunning = false;

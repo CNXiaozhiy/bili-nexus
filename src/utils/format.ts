@@ -8,16 +8,24 @@ export default class FormatUtils {
    * @param separator 分隔符，默认为逗号
    * @returns 格式化后的字符串
    */
-  static addThousandsSeparator(num: number | string, separator: string = ","): string {
+  static addThousandsSeparator(
+    num: number | string,
+    separator: string = ","
+  ): string {
     // 转换为字符串并处理小数部分
     const numStr = num.toString();
     const [integerPart, decimalPart] = numStr.split(".");
 
     // 为整数部分添加千位分隔符
-    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, separator);
+    const formattedInteger = integerPart.replace(
+      /\B(?=(\d{3})+(?!\d))/g,
+      separator
+    );
 
     // 如果有小数部分，重新拼接
-    return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+    return decimalPart
+      ? `${formattedInteger}.${decimalPart}`
+      : formattedInteger;
   }
 
   /**
@@ -26,8 +34,14 @@ export default class FormatUtils {
    * @param fillZero 是否补零，默认为 true
    * @returns 格式化后的时间字符串
    */
-  static formatDateTime(date: Date | number | string = new Date(), fillZero: boolean = true): string {
-    const dateObj = typeof date === "string" || typeof date === "number" ? new Date(date) : date;
+  static formatDateTime(
+    date: Date | number | string = new Date(),
+    fillZero: boolean = true
+  ): string {
+    const dateObj =
+      typeof date === "string" || typeof date === "number"
+        ? new Date(date)
+        : date;
 
     if (isNaN(dateObj.getTime())) {
       throw new Error("Invalid date");
@@ -45,7 +59,9 @@ export default class FormatUtils {
       return fillZero ? num.toString().padStart(2, "0") : num.toString();
     };
 
-    return `${year}-${padZero(month)}-${padZero(day)} ${padZero(hours)}:${padZero(minutes)}:${padZero(seconds)}`;
+    return `${year}-${padZero(month)}-${padZero(day)} ${padZero(
+      hours
+    )}:${padZero(minutes)}:${padZero(seconds)}`;
   }
 
   /**
