@@ -660,6 +660,22 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     return recorders;
   }
 
+  public getUploadersMapByRoomId(roomId: number) {
+    const uploaders = new Map<string, VideoUploader>();
+    this.hashToRoomIdMap.forEach((_roomId, hash) => {
+      if (_roomId === roomId) {
+        const uploader = this.videoUploaders.get(hash);
+        if (uploader) {
+          uploaders.set(hash, uploader);
+        } else {
+          logger.warn(`存在无录制器器负责的 hash -> ${hash}`);
+        }
+      }
+    });
+
+    return uploaders;
+  }
+
   public awaitLiveMonitorsPool() {
     const promises: Promise<any>[] = [];
     this.liveMonitors.forEach((monitor) => {

@@ -659,6 +659,75 @@ export default class QQBotService {
       return messages.intersperse(OneBotMessageUtils.Text("\n\n"));
     });
 
+    this.groupCommandProcessor.register("投稿进度", async (args, context) => {
+      const query = new SubscriptionQuery(qqBotConfigManager.get("liveRoom"));
+      const rooms = query.getUserGroupSubscriptions(
+        context.event.user_id,
+        context.event.group_id
+      );
+
+      if (rooms.length == 0) {
+        return "您在本群暂无订阅";
+      }
+
+      const result: SegmentMessages = [];
+
+      let index = 0;
+      for (let _roomId of rooms) {
+        index++;
+        const roomId = parseInt(_roomId);
+        const uploaders =
+          this.liveAutomationManager.getUploadersMapByRoomId(roomId);
+
+        result.push(OneBotMessageUtils.Text(`直播间${_roomId} 投稿器列表:`));
+        if (uploaders.size === 0) {
+          result.push(OneBotMessageUtils.Text("投稿器"));
+          continue;
+        }
+
+        uploaders.forEach((uploader, hash) => {
+          const tasks = uploader.getTasks();
+
+          result.push(
+            OneBotMessageUtils.Text(`投稿器 ${hash.substring(0, 7)}:`)
+          );
+
+          tasks.forEach((videoTask, index) => {
+            const videoName = index === 0 ? "主投稿" : `视频 ${index}`;
+
+            videoTask.forEach((task, index) => {});
+
+            result.push(
+              OneBotMessageUtils.Text(
+                `${videoName}\n` +
+                  `- 投稿进度:\n` +
+                  videoTask
+                    .map((task, index) => {
+                      return (
+                        `- ${task.name}\n` +
+                        `  - 状态: ${
+                          task.status === "success"
+                            ? "成功 ✅"
+                            : task.status === "error"
+                            ? "失败 ❌"
+                            : "操作 ⌛️"
+                        }\n` +
+                        `  - 信息: ${task.message || "无"}\n` +
+                        `  - 进度: ${task.process || "无"}\n` +
+                        `  - 耗时: ${task.duration || "未知"}`
+                      );
+                    })
+                    .join("\n")
+              )
+            );
+          });
+        });
+      }
+
+      if (result.length === 1) return [OneBotMessageUtils.Text("无投稿器")];
+      return result.intersperse(OneBotMessageUtils.Text("\n\n"));
+    });
+
     this.groupCommandProcessor.register("录制状态", async (args, context) => {
       const query = new SubscriptionQuery(qqBotConfigManager.get("liveRoom"));
       const rooms = query.getUserGroupSubscriptions(
