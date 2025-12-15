@@ -1,6 +1,7 @@
 import EventEmitter from "events";
 import BiliApiService from "../bili-api";
 import getLogger from "@/utils/logger";
+import { SpaceDynamicItem } from "@/types/bili";
 
 const logger = getLogger("SpaceDynamicMonitor");
 
@@ -10,7 +11,7 @@ export interface SpaceDynamicMonitorOptions {
 }
 
 export interface SpaceDynamicMonitorEvents {
-  new: [id: string];
+  new: [id: string, dynamic: SpaceDynamicItem];
 }
 
 export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonitorEvents> {
@@ -45,7 +46,7 @@ export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonito
 
       if (this.lastDynamicId && this.lastDynamicId !== dynamicId) {
         logger.info(`检测到新动态, ${this.mid} ->  的最新动态 ${dynamicId}`);
-        this.emit("new", dynamicId);
+        this.emit("new", dynamicId, item);
       }
 
       this.lastDynamicId = dynamicId;

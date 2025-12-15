@@ -106,6 +106,25 @@ export default class HtmlRender {
     });
   }
 
+  private async waitForAllResources(page: any, timeout = 30000) {
+    await page
+      .evaluate(() => {
+        // 等待所有图片加载
+        return Promise.all(
+          Array.from(document.images, (img: HTMLImageElement) => {
+            if (img.complete) return Promise.resolve();
+            return new Promise((resolve, reject) => {
+              img.addEventListener("load", resolve);
+              img.addEventListener("error", reject);
+            });
+          })
+        );
+      })
+      .catch((e: Error) => {
+        logger.warn(`渲染时出错, 加载图片资源失败`, e);
+      });
+  }
+
   public async renderHtmlCodeToImage(
     html: string,
     screenshotPath: ScreenshotOptions["path"]
@@ -123,7 +142,12 @@ export default class HtmlRender {
 
     const page = await this.browser.newPage();
     try {
-      await page.setContent(html);
+      await page.setContent(html, {
+        waitUntil: ["load", "networkidle0", "domcontentloaded"],
+      });
+
+      await this.waitForAllResources(page);
+
       const path = await page.screenshot({
         type: "png",
         path: screenshotPath,
@@ -144,7 +168,12 @@ export default class HtmlRender {
 
     const page = await this.browser.newPage();
     try {
-      await page.setContent(html);
+      await page.setContent(html, {
+        waitUntil: ["load", "networkidle0", "domcontentloaded"],
+      });
+
+      await this.waitForAllResources(page);
+
       const base64 = await page.screenshot({
         type: "png",
         encoding: "base64",
@@ -173,7 +202,12 @@ export default class HtmlRender {
 
     const page = await this.browser.newPage();
     try {
-      await page.goto(url);
+      await page.goto(url, {
+        waitUntil: ["load", "networkidle0", "domcontentloaded"],
+      });
+
+      await this.waitForAllResources(page);
+
       const width = (await page.evaluate(
         "document.body.scrollWidth"
       )) as number;
@@ -201,7 +235,12 @@ export default class HtmlRender {
 
     const page = await this.browser.newPage();
     try {
-      await page.goto(url);
+      await page.goto(url, {
+        waitUntil: ["load", "networkidle0", "domcontentloaded"],
+      });
+
+      await this.waitForAllResources(page);
+
       const width = (await page.evaluate(
         "document.body.scrollWidth"
       )) as number;

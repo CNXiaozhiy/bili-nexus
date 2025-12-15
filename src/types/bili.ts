@@ -755,6 +755,30 @@ export interface VideoInfo {
   argue_info: any;
 }
 
+export type DynamicType =
+  | "DYNAMIC_TYPE_NONE"
+  | "DYNAMIC_TYPE_FORWARD"
+  | "DYNAMIC_TYPE_AV"
+  | "DYNAMIC_TYPE_PGC"
+  | "DYNAMIC_TYPE_COURSES"
+  | "DYNAMIC_TYPE_WORD"
+  | "DYNAMIC_TYPE_DRAW"
+  | "DYNAMIC_TYPE_ARTICLE"
+  | "DYNAMIC_TYPE_MUSIC"
+  | "DYNAMIC_TYPE_COMMON_SQUARE"
+  | "DYNAMIC_TYPE_COMMON_VERTICAL"
+  | "DYNAMIC_TYPE_LIVE"
+  | "DYNAMIC_TYPE_MEDIALIST"
+  | "DYNAMIC_TYPE_COURSES_SEASON"
+  | "DYNAMIC_TYPE_COURSES_BATCH"
+  | "DYNAMIC_TYPE_AD"
+  | "DYNAMIC_TYPE_APPLET"
+  | "DYNAMIC_TYPE_SUBSCRIPTION"
+  | "DYNAMIC_TYPE_LIVE_RCMD"
+  | "DYNAMIC_TYPE_BANNER"
+  | "DYNAMIC_TYPE_UGC_SEASON"
+  | "DYNAMIC_TYPE_SUBSCRIPTION_NEW";
+
 export interface SpaceDynamicItem {
   basic: {
     comment_id_str: string;
@@ -916,7 +940,7 @@ export interface SpaceDynamicItem {
       text: string;
     };
   };
-  type: string;
+  type: DynamicType;
   visible: boolean;
 }
 

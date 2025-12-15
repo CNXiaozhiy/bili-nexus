@@ -1230,10 +1230,19 @@ export default class QQBotService {
     spaceDynamicMonitor: SpaceDynamicMonitor,
     mid: number
   ) {
-    spaceDynamicMonitor.on("new", (dynamicId) => {
+    spaceDynamicMonitor.on("new", (dynamicId, dynamic) => {
       logger.debug(
-        `收到 spaceDynamicMonitor 的事件 -> new, mid: ${mid}, dynamicId: ${dynamicId}`
+        `收到 spaceDynamicMonitor 的事件 -> new, mid: ${mid}, dynamicId: ${dynamicId}, dynamic:`,
+        dynamic
       );
+
+      if (
+        ["DYNAMIC_TYPE_LIVE_RCMD", "DYNAMIC_TYPE_LIVE"].includes(dynamic.type)
+      ) {
+        logger.info(`收到直播通知类型动态，跳过通知`);
+        return;
+      }
+
       const usersDynamicConfig = qqBotConfigManager.get("userDynamic");
       const userConfig = usersDynamicConfig[mid];
       const query = new SubscriptionQuery(usersDynamicConfig);
@@ -1286,7 +1295,9 @@ export default class QQBotService {
             });
 
         await this.bot.sendGroup(gid, [
-          OneBotMessageUtils.Base64Image(await this.htmlTemplatesRender.newDynamic(dynamicId)),
+          OneBotMessageUtils.Base64Image(
+            await this.htmlTemplatesRender.newDynamic(dynamicId)
+          ),
         ]);
 
         await this.bot.sendGroup(gid, [
