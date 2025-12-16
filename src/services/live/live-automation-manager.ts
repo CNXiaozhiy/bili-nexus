@@ -16,6 +16,7 @@ import notifyEmitter from "../system/notify-emitter";
 import VideoUploader from "../video/video-uploader";
 import FormatUtils from "@/utils/format";
 import { getVersion } from "../version";
+import { BiliAccount } from "@/core/bilibili/bili-account";
 
 const logger = getLogger("LiveAutomationManager");
 
@@ -72,7 +73,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
   private waitingForRestartRecordTask = new Set<string>(); // 直播Hash
 
-  constructor() {
+  constructor(private readonly biliAccount: BiliAccount) {
     super();
 
     this.initDiskSpaceMonitor();
@@ -168,7 +169,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
         roomId: roomId,
         slideshowAsEnd: biliConfigManager.get("slideshowAsEnd"),
       },
-      BiliAccountService.getDefault()
+      this.biliAccount
     );
 
     this.liveMonitors.set(roomId, liveMonitor);
@@ -277,7 +278,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       logger.info(`房间 ${roomId} 准备录制`);
     }
 
-    const inputUrls = await BiliAccountService.getDefault()
+    const inputUrls = await this.biliAccount
       .getBiliApi()
       .getLiveStreamUrl(roomId);
     const inputUrl = inputUrls[0];
@@ -336,7 +337,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       logger.error(`房间 ${roomId} 录制失败: ${err}`);
       logger.debug("尝试更换直播流");
 
-      BiliAccountService.getDefault()
+      this.biliAccount
         .getBiliApi()
         .getLiveStreamUrl(roomId)
         .then((urls) => {
@@ -458,7 +459,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     logger.debug(`采用投稿账号 -> ${customOptions?.account || "默认账号"}`);
     const biliAccount = customOptions?.account
       ? BiliAccountService.getBiliAccount(customOptions.account)
-      : BiliAccountService.getDefault();
+      : this.biliAccount;
 
     if (!biliAccount) {
       throw new CustomBiliAccountNotFound();
@@ -575,7 +576,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       if (shouldUpload) {
         const resp = await recorder.stopRecordAndMerge();
         // 手动获取直播间信息
-        const roomInfo = await BiliAccountService.getDefault()
+        const roomInfo = await this.biliAccount
           .getBiliApi()
           .getLiveRoomInfo(roomId);
 

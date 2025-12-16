@@ -1,6 +1,7 @@
 import EventEmitter from "events";
 import SpaceDynamicMonitor from "./space-dynamic-monitor";
 import { getLogger } from "log4js";
+import { BiliAccount } from "@/core/bilibili/bili-account";
 
 const logger = getLogger("DynamicAutomationManager");
 
@@ -13,7 +14,7 @@ export default class DynamicAutomationManager extends EventEmitter<DynamicAutoma
   private monitors: Map<number, SpaceDynamicMonitor> = new Map(); // mid -> SpaceDynamicMonitor
   private users = new Set<number>();
 
-  constructor() {
+  constructor(private readonly biliAccount: BiliAccount) {
     super();
   }
 
@@ -24,7 +25,10 @@ export default class DynamicAutomationManager extends EventEmitter<DynamicAutoma
 
     logger.debug(`添加用户 ${mid}`);
     this.users.add(mid);
-    const monitor = new SpaceDynamicMonitor({ mid });
+    const monitor = new SpaceDynamicMonitor(
+      { mid },
+      this.biliAccount.getBiliApi()
+    );
     this.monitors.set(mid, monitor);
     logger.debug(`发射事件 new-monitor -> SpaceDynamicMonitor.mid: ${mid}`);
     this.emit("new-monitor", monitor, mid);

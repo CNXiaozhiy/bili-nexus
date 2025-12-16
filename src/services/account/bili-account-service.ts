@@ -33,8 +33,8 @@ export default class BiliAccountService {
 
   public static registerDefault(account: UserAccount) {
     logger.info("设置默认账号: ", account.getUid());
-    BiliAccountService.DefaultBiliAccount =
-      BiliAccountService.register(account);
+    return (BiliAccountService.DefaultBiliAccount =
+      BiliAccountService.register(account));
   }
 
   public static getDefault() {

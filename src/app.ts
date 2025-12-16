@@ -108,6 +108,8 @@ export class App {
     const defaultAccount = accountConfigManager.get("defaultUid");
     const accounts = accountConfigManager.get("accounts");
 
+    let defaultBiliAccount: BiliAccount;
+
     if (!defaultAccount) {
       logger.warn(
         "默认账号未配置，请在 config/account.json 中配置后重启服务或使用命令行登录"
@@ -115,14 +117,14 @@ export class App {
       // 登录默认账号
       try {
         const userAccount = await loginAccountByConsole(true);
-        BiliAccountService.registerDefault(userAccount);
+        defaultBiliAccount = BiliAccountService.registerDefault(userAccount);
       } catch (e) {
         logger.error("登录失败", e);
         process.exit(1);
       }
     } else {
       // 注册默认账号
-      BiliAccountService.registerDefault(
+      defaultBiliAccount = BiliAccountService.registerDefault(
         new UserAccount(
           defaultAccount,
           accounts[defaultAccount].cookie,
@@ -166,7 +168,7 @@ export class App {
 
     // 初始化 LiveAutomationManager
     const rooms = liveConfigManager.get("rooms");
-    this.liveAutomationManager = new LiveAutomationManager();
+    this.liveAutomationManager = new LiveAutomationManager(defaultBiliAccount);
 
     for (const roomId in rooms) {
       if (!rooms[roomId].enable) {
@@ -186,7 +188,9 @@ export class App {
     logger.info("LiveMonitors 全部 Pool 完成 ✅");
 
     // 初始化 DynamicAutomationManager
-    this.dynamicAutomationManager = new DynamicAutomationManager();
+    this.dynamicAutomationManager = new DynamicAutomationManager(
+      defaultBiliAccount
+    );
     const users = userDynamicConfigManager.get("users");
     for (const uid in users) {
       this.dynamicAutomationManager.addUser(parseInt(uid));
@@ -231,6 +235,7 @@ app.run().then(() => logger.info("App 启动成功✅"));
 
 import notifyEmitter from "./services/system/notify-emitter";
 import FormatUtils from "./utils/format";
+import { BiliAccount } from "./core/bilibili/bili-account";
 
 if (true) {
   process.on("uncaughtException", (error) => {

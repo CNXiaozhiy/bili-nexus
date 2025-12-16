@@ -2,6 +2,7 @@ import EventEmitter from "events";
 import getLogger from "@/utils/logger";
 import { SpaceDynamicItem } from "@/types/bilibili";
 import BiliAccountService from "../account/bili-account-service";
+import BiliApi from "@/core/bilibili/bili-api";
 
 const logger = getLogger("SpaceDynamicMonitor");
 
@@ -22,7 +23,10 @@ export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonito
   private lastDynamicId: string = "";
   private lastDynamicPubTs: number = 0;
 
-  constructor(options: SpaceDynamicMonitorOptions) {
+  constructor(
+    options: SpaceDynamicMonitorOptions,
+    private readonly biliApi: BiliApi
+  ) {
     super();
     this.mid = options.mid;
     this.interval = options.interval ?? 10000;
@@ -30,9 +34,10 @@ export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonito
 
   public async poll() {
     try {
-      const { data: spaceDynamic } = await BiliAccountService.getDefault()
-        .getBiliApi()
-        .getSpaceDynamic(this.mid, true);
+      const { data: spaceDynamic } = await this.biliApi.getSpaceDynamic(
+        this.mid,
+        true
+      );
       let item = spaceDynamic.items[0];
       if (item.modules.module_tag && item.modules.module_tag.text === "置顶")
         item = spaceDynamic.items[1];
