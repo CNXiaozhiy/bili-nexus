@@ -22,3 +22,16 @@ export class FfmpegExitError extends FfmpegError {
     this.signal = signal;
   }
 }
+
+export class FfmpegExitWithError extends FfmpegExitError {
+  error: FfmpegError;
+  constructor(
+    message: string,
+    code: number | null,
+    signal: string | null,
+    error: FfmpegError
+  ) {
+    super(message, code, signal);
+    this.error = error;
+  }
+}

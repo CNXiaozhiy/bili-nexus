@@ -6,6 +6,7 @@ import {
   FfmpegError,
   FfmpegSetupError,
   FfmpegExitError,
+  FfmpegExitWithError,
 } from "@/types/errors/ffmpeg";
 import {
   FfmpegStats,
@@ -14,6 +15,10 @@ import {
   FfmpegRecorderStatus,
   FfmpegScreenshotStatus,
 } from "@/types/ffmpeg";
+import getLogger from "@/utils/logger";
+import { error } from "console";
+
+const logger = getLogger("Ffmpeg");
 
 export interface FfmpegEvents {
   start: [void];
@@ -43,6 +48,7 @@ export abstract class FfmpegCommand extends EventEmitter<FfmpegEvents> {
   protected status: FfmpegCommandStatus = FfmpegCommandStatus.NOT_STARTED;
   protected isRunning: boolean = false;
   protected stats: FfmpegStats[] = [];
+  protected ffmpegErrorLines: string = "";
 
   constructor(args: string[]) {
     super();
@@ -71,6 +77,7 @@ export abstract class FfmpegCommand extends EventEmitter<FfmpegEvents> {
       this.isRunning = true;
       this.startTime = Date.now();
       this.status = FfmpegCommandStatus.RUNNING;
+      this.ffmpegErrorLines = "";
       this.emit("start");
 
       this.process.stdout?.on("data", (data: Buffer) => {
@@ -93,12 +100,22 @@ export abstract class FfmpegCommand extends EventEmitter<FfmpegEvents> {
           this.handleCompletion();
         } else {
           this.status = FfmpegCommandStatus.ERROR;
-          const error = new FfmpegExitError(
-            `FFmpeg process exited with code ${code}`,
-            code,
-            signal
-          );
-          this.emit("err", error);
+          if (this.ffmpegErrorLines) {
+            const error = new FfmpegExitWithError(
+              `FFmpeg process exited with code ${code}`,
+              code,
+              signal,
+              new FfmpegError(this.ffmpegErrorLines)
+            );
+            this.emit("err", error);
+          } else {
+            const error = new FfmpegExitError(
+              `FFmpeg process exited with code ${code}`,
+              code,
+              signal
+            );
+            this.emit("err", error);
+          }
         }
       });
 
@@ -202,14 +219,16 @@ export abstract class FfmpegCommand extends EventEmitter<FfmpegEvents> {
       /failed/i,
       /invalid/i,
       /cannot/i,
-      // /unknown/i,
+      /unknown/i,
       /not found/i,
       /permission denied/i,
     ];
 
     if (errorPatterns.some((pattern) => pattern.test(line))) {
       const error = new FfmpegError(`FFmpeg error: ${line.trim()}`);
-      this.emit("err", error);
+      this.ffmpegErrorLines += line.trim() + "\n";
+      logger.warn("Maybe Error: ", error);
+      // this.emit("err", error);
     }
   }
 
@@ -343,7 +362,7 @@ export class ConcatFfmpeg extends FfmpegCommand {
         fs.unlinkSync(this.fileListPath);
       }
     } catch (error) {
-      console.error("Failed to cleanup file list:", error);
+      logger.error("Failed to cleanup file list:", error);
     }
   }
 
@@ -355,7 +374,7 @@ export class ConcatFfmpeg extends FfmpegCommand {
         }
       }
     } catch (error) {
-      console.error("Failed to cleanup input files:", error);
+      logger.error("Failed to cleanup input files:", error);
     }
   }
 }
