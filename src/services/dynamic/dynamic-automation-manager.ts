@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import SpaceDynamicMonitor from "./space-dynamic-monitor";
+import SpaceDynamicMonitor from "@/core/bilibili/dynamic/space-dynamic-monitor";
 import { getLogger } from "log4js";
 import { BiliAccount } from "@/core/bilibili/bili-account";
 

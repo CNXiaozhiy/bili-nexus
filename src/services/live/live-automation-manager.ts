@@ -1,6 +1,6 @@
 import EventEmitter from "events";
-import LiveMonitor from "./live-monitor";
-import LiveRecorder from "./live-recorder";
+import LiveMonitor from "@/core/bilibili/live/live-monitor";
+import LiveRecorder from "@/core/bilibili/live/live-recorder";
 import {
   appConfigManager,
   biliConfigManager,
@@ -11,9 +11,9 @@ import getLogger from "@/utils/logger";
 import { LiveRoomInfo, LiveRoomStatus, UserCard } from "@/types/bilibili";
 import { UploadOptions as CustomOptions } from "@/common/config";
 import BiliUtils from "@/utils/bili";
-import DiskSpaceMonitor from "../system/disk-space-monitor";
-import notifyEmitter from "../system/notify-emitter";
-import VideoUploader from "../video/video-uploader";
+import DiskSpaceMonitor from "@/core/disk/disk-space-monitor";
+import notifyEmitter from "@/core/app/notify-emitter";
+import VideoUploader from "@/core/bilibili/video/video-uploader";
 import FormatUtils from "@/utils/format";
 import { getVersion } from "../version";
 import { BiliAccount } from "@/core/bilibili/bili-account";

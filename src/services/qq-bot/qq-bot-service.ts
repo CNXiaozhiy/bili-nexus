@@ -20,19 +20,20 @@ import {
   qqBotConfigManager,
   userDynamicConfigManager,
 } from "@/common";
-import LiveMonitor from "../live/live-monitor";
-import LiveRecorder from "../live/live-recorder";
-import SpaceDynamicMonitor from "../dynamic/space-dynamic-monitor";
-import HtmlTemplatesRender from "./html-template-render";
-import CommandProcessor from "@/utils/command-processor";
-import FormatUtils from "@/utils/format";
-import BiliAccountService from "../account/bili-account-service";
-import notifyEmitter from "../system/notify-emitter";
-import VideoUploader from "../video/video-uploader";
 import { DataStore } from "@/common/config";
-import { screenshotSync } from "@/utils/ffmpeg";
+import notifyEmitter from "@/core/app/notify-emitter";
 import { loginAccount } from "@/core/bilibili/account-login";
+import LiveMonitor from "@/core/bilibili/live/live-monitor";
+import LiveRecorder from "@/core/bilibili/live/live-recorder";
+import VideoUploader from "@/core/bilibili/video/video-uploader";
+import SpaceDynamicMonitor from "@/core/bilibili/dynamic/space-dynamic-monitor";
+import HtmlTemplatesRender from "@/core/render/html-template-render";
+import CommandProcessor from "@/utils/command-processor";
+import { screenshotSync } from "@/utils/ffmpeg";
+import FormatUtils from "@/utils/format";
 import BiliUtils from "@/utils/bili";
+
+import BiliAccountService from "../account/bili-account-service";
 
 const logger = getLogger("QQBotService");
 

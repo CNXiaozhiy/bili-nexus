@@ -1,11 +1,10 @@
-import BiliUtils from "@/utils/bili";
-import { BiliAccount } from "@/core/bilibili/bili-account";
 import fs from "fs";
 import path from "path";
 import pLimit from "p-limit";
 import getLogger from "@/utils/logger";
 import EventEmitter from "events";
 import BiliApi from "@/core/bilibili/bili-api";
+import { BiliAccount } from "@/core/bilibili/bili-account";
 
 export interface VideoInfo {
   title: string;

@@ -233,7 +233,7 @@ const app = new App();
 
 app.run().then(() => logger.info("App 启动成功✅"));
 
-import notifyEmitter from "./services/system/notify-emitter";
+import notifyEmitter from "./core/app/notify-emitter";
 import FormatUtils from "./utils/format";
 import { BiliAccount } from "./core/bilibili/bili-account";
 

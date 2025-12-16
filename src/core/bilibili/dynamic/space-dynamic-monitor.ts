@@ -1,7 +1,6 @@
 import EventEmitter from "events";
 import getLogger from "@/utils/logger";
 import { SpaceDynamicItem } from "@/types/bilibili";
-import BiliAccountService from "../account/bili-account-service";
 import BiliApi from "@/core/bilibili/bili-api";
 
 const logger = getLogger("SpaceDynamicMonitor");

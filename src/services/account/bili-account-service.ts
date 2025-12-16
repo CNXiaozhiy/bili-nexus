@@ -2,7 +2,7 @@ import { accountConfigManager } from "@/common";
 import UserAccount from "@/core/bilibili/account";
 import { BiliAccount } from "@/core/bilibili/bili-account";
 import getLogger from "@/utils/logger";
-import notifyEmitter from "../system/notify-emitter";
+import notifyEmitter from "@/core/app/notify-emitter";
 import FormatUtils from "@/utils/format";
 
 export class BiliAccountServiceError extends Error {}
