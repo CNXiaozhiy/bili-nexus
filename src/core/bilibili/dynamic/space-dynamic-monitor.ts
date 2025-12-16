@@ -28,7 +28,7 @@ export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonito
   ) {
     super();
     this.mid = options.mid;
-    this.interval = options.interval ?? 10000;
+    this.interval = options.interval ?? 30000;
   }
 
   public async poll() {
