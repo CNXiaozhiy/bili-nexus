@@ -871,7 +871,7 @@ export interface SpaceDynamicItem {
       pub_action: string;
       pub_location_text: string;
       pub_time: string;
-      pub_ts: number;
+      pub_ts: string;
       type: string;
       vip: {
         avatar_subscript: number;
@@ -949,7 +949,7 @@ export interface SpaceDynamic {
   items: SpaceDynamicItem[];
   offset: string;
   update_baseline: string;
-  update_num: number;
+  update_num: string;
 }
 
 export interface DynamicDetail {

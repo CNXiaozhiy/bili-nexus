@@ -47,14 +47,25 @@ export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonito
         logger.info(`记录初始动态, ${this.mid} -> 的最新动态 ${dynamicId}`);
       }
 
+      const pubTs = parseInt(item.modules.module_author.pub_ts);
+
       if (this.lastDynamicId && this.lastDynamicId !== dynamicId) {
-        logger.debug(
-          `检测到动态更新, ${this.mid} 的最新动态, LN: ${this.lastDynamicId} -> ${dynamicId}, 发布于: ${item.modules.module_author.pub_time}`
-        );
-        if (this.lastDynamicPubTs === item.modules.module_author.pub_ts) {
-          // 仅 ID 变化
+        // Debug
+        if (Math.floor(Date.now() / 1000) - pubTs >= 10 * 60) {
+          logger.warn("检测到发布时间晚于现在10分钟的动态");
+          logger.debug("lastDynamicId ->", this.lastDynamicId);
+          logger.debug("currentDynamicId ->", dynamicId);
+          logger.debug("lastDynamicPubTs ->", this.lastDynamicPubTs);
+          logger.debug(
+            "currentDynamicPubTs ->",
+            item.modules.module_author.pub_ts
+          );
+          logger.debug("PubTime ->", item.modules.module_author.pub_time);
+        }
+        if (pubTs <= this.lastDynamicPubTs) {
+          // 动态发布的比上一次的最新的动态还早，可能发生了删除动态动作
           logger.warn(
-            "检测到最新动态ID变化但pub_ts未变化，判定为动态ID调整而非新动态发布"
+            "检测到最新动态发布时间异常，判定为动态更改或删除而非新动态发布"
           );
           logger.warn("该动态发布于: " + item.modules.module_author.pub_time);
         } else {
@@ -66,7 +77,7 @@ export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonito
       }
 
       this.lastDynamicId = dynamicId;
-      this.lastDynamicPubTs = item.modules.module_author.pub_ts;
+      this.lastDynamicPubTs = pubTs;
     } catch (e) {}
   }
 
