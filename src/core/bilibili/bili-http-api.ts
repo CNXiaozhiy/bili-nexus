@@ -10,8 +10,8 @@ import {
   UserCard,
   UserInfo,
   VideoInfo,
-} from "@/types/bili";
-import { Response } from "@/types/bili-api";
+} from "@/types/bilibili";
+import { Response } from "@/types/bilibili/bili-http-api";
 import { BiliHttpApiError } from "@/types/errors/bili-api";
 import {
   AccountLoginExpiredError,
@@ -19,6 +19,7 @@ import {
 } from "@/types/errors/bili-http-api";
 import fs from "fs";
 import { AxiosError, AxiosProgressEvent } from "axios";
+import { IBiliHttpApi } from "@/types/bilibili/bili-http-api";
 
 function checkResponseCode<T>(resp: Response<T>) {
   if (resp.code !== 0)
@@ -33,8 +34,10 @@ const videoApiCachePool: Map<string, VideoInfo> = new Map(); // bvid -> VideoInf
 const userCardCachePool: Map<number, UserCard> = new Map(); // mid -> UserCard
 const userInfoCachePool: Map<number, UserInfo> = new Map(); // mid -> Userinfo
 
-export default class BiliHttpApi {
-  constructor(private cookie: string) {}
+export default abstract class BiliHttpApi implements IBiliHttpApi {
+  constructor() {}
+
+  abstract getCookie(): string;
 
   // 账号类
 
@@ -92,7 +95,7 @@ export default class BiliHttpApi {
    * @returns
    */
   async checkCookie() {
-    const csrf = BiliUtils.getCSRF(this.cookie);
+    const csrf = BiliUtils.getCSRF(this.getCookie());
     const resp = await request.get<{
       code: 0 | -101;
       message: string;
@@ -100,7 +103,7 @@ export default class BiliHttpApi {
     }>(
       `https://passport.bilibili.com/x/passport-login/web/cookie/info?csrf=${csrf}`,
       {
-        headers: { cookie: this.cookie },
+        headers: { cookie: this.getCookie() },
       }
     );
 
@@ -116,7 +119,7 @@ export default class BiliHttpApi {
    */
   async refreshCookie(refresh_token: string) {
     const timestamp = Date.now();
-    const csrf = BiliUtils.getCSRF(this.cookie);
+    const csrf = BiliUtils.getCSRF(this.getCookie());
 
     const publicKey = await crypto.subtle.importKey(
       "jwk",
@@ -147,7 +150,7 @@ export default class BiliHttpApi {
       `https://www.bilibili.com/correspond/1/${correspondPath}`,
       {
         headers: {
-          cookie: this.cookie,
+          cookie: this.getCookie(),
         },
       }
     );
@@ -168,7 +171,7 @@ export default class BiliHttpApi {
       {
         method: "POST",
         headers: {
-          cookie: this.cookie,
+          cookie: this.getCookie(),
         },
       }
     );
@@ -211,7 +214,7 @@ export default class BiliHttpApi {
       {
         headers: {
           Referer: "https://live.bilibili.com/",
-          cookie: this.cookie,
+          cookie: this.getCookie(),
           "No-Retry": noRetry,
         },
       }
@@ -228,7 +231,7 @@ export default class BiliHttpApi {
       {
         headers: {
           Referer: "https://live.bilibili.com/",
-          cookie: this.cookie,
+          cookie: this.getCookie(),
         },
         shouldRetry: (resp) => resp.data.code === 19001012, // bvc-play-url-one
       }
@@ -278,7 +281,7 @@ export default class BiliHttpApi {
       {
         headers: {
           Referer: "https://live.bilibili.com/",
-          cookie: this.cookie,
+          cookie: this.getCookie(),
         },
       }
     );
@@ -300,7 +303,7 @@ export default class BiliHttpApi {
     const resp = await request.get<Response<LoginInfo>>(
       "https://api.bilibili.com/x/web-interface/nav",
       {
-        headers: { cookie: this.cookie },
+        headers: { cookie: this.getCookie() },
       }
     );
 
@@ -319,7 +322,7 @@ export default class BiliHttpApi {
     const resp = await request.get<Response<UserCard>>(
       `https://api.bilibili.com/x/web-interface/card?mid=${mid}`,
       {
-        headers: { cookie: this.cookie },
+        headers: { cookie: this.getCookie() },
       }
     );
 
@@ -342,7 +345,7 @@ export default class BiliHttpApi {
     )}`;
 
     const resp = await request.get<Response<UserInfo>>(url, {
-      headers: { cookie: this.cookie },
+      headers: { cookie: this.getCookie() },
     });
 
     checkResponseCode(resp.data);
@@ -356,7 +359,7 @@ export default class BiliHttpApi {
     const resp = await request.get<Response<SpaceDynamic>>(
       `https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/space?host_mid=${uid}`,
       {
-        headers: { cookie: this.cookie, "No-Retry": noRetry },
+        headers: { cookie: this.getCookie(), "No-Retry": noRetry },
       }
     );
 
@@ -369,7 +372,7 @@ export default class BiliHttpApi {
     const resp = await request.get<Response<DynamicDetail>>(
       `https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id=${dynamicId}`,
       {
-        headers: { cookie: this.cookie },
+        headers: { cookie: this.getCookie() },
       }
     );
 
@@ -401,7 +404,7 @@ export default class BiliHttpApi {
       {
         headers: {
           Referer: "https://member.bilibili.com/platform/upload/video/frame",
-          cookie: this.cookie,
+          cookie: this.getCookie(),
         },
       }
     );
@@ -431,7 +434,7 @@ export default class BiliHttpApi {
           Origin: "https://member.bilibili.com",
           Referer: "https://member.bilibili.com/",
           "X-Upos-Auth": options.auth,
-          cookie: this.cookie,
+          cookie: this.getCookie(),
         },
       }
     );
@@ -460,7 +463,7 @@ export default class BiliHttpApi {
           Origin: "https://member.bilibili.com",
           Referer: "https://member.bilibili.com/",
           "X-Upos-Auth": options.auth,
-          Cookie: this.cookie,
+          Cookie: this.getCookie(),
         },
       }
     );
@@ -470,7 +473,7 @@ export default class BiliHttpApi {
   }
 
   async uploadCover(cover: string) {
-    const csrf = BiliUtils.getCSRF(this.cookie);
+    const csrf = BiliUtils.getCSRF(this.getCookie());
 
     const resp = await request.instance<{
       code: number;
@@ -483,7 +486,7 @@ export default class BiliHttpApi {
         Origin: "https://member.bilibili.com",
         Referer: "https://member.bilibili.com/",
         "Content-Type": "application/x-www-form-urlencoded",
-        Cookie: this.cookie,
+        Cookie: this.getCookie(),
       },
       data: {
         csrf,
@@ -572,7 +575,7 @@ export default class BiliHttpApi {
   }
 
   async uploadVideo(data: any) {
-    const csrf = BiliUtils.getCSRF(this.cookie);
+    const csrf = BiliUtils.getCSRF(this.getCookie());
 
     const resp = await request.instance<
       Response<{ aid: number; bvid: string }>
@@ -582,7 +585,7 @@ export default class BiliHttpApi {
         Origin: "https://member.bilibili.com",
         Referer: "https://member.bilibili.com/",
         "Content-Type": "application/json",
-        Cookie: this.cookie,
+        Cookie: this.getCookie(),
       },
       data: {
         csrf,
@@ -596,7 +599,7 @@ export default class BiliHttpApi {
   }
 
   async addSeason(options: { title: string; desc: string; cover?: string }) {
-    const csrf = BiliUtils.getCSRF(this.cookie);
+    const csrf = BiliUtils.getCSRF(this.getCookie());
     const resp = await request.post<Response<number>>(
       `https://member.bilibili.com/x2/creative/web/season/add`,
       {
@@ -604,7 +607,7 @@ export default class BiliHttpApi {
           Origin: "https://member.bilibili.com",
           Referer: "https://member.bilibili.com",
           "Content-Type": "application/x-www-form-urlencoded",
-          Cookie: this.cookie,
+          Cookie: this.getCookie(),
         },
       },
       {
@@ -628,7 +631,7 @@ export default class BiliHttpApi {
     episodes: { aid: number; cid: number; title: string }[];
     sectionId: number;
   }) {
-    const csrf = BiliUtils.getCSRF(this.cookie);
+    const csrf = BiliUtils.getCSRF(this.getCookie());
     const resp = await request.post<{
       code: number;
       message: string;
@@ -640,7 +643,7 @@ export default class BiliHttpApi {
           Origin: "https://member.bilibili.com",
           Referer: "https://member.bilibili.com",
           "Content-Type": "application/json",
-          Cookie: this.cookie,
+          Cookie: this.getCookie(),
         },
       },
       {
@@ -760,7 +763,7 @@ export default class BiliHttpApi {
           Origin: "https://member.bilibili.com",
           Referer: "https://member.bilibili.com",
           "Content-Type": "application/json",
-          Cookie: this.cookie,
+          Cookie: this.getCookie(),
         },
       }
     );

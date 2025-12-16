@@ -1,4 +1,4 @@
-import { LiveRoomStatus, VipType } from "@/types/bili";
+import { LiveRoomStatus, VipType } from "@/types/bilibili";
 import Crypto from "crypto";
 
 export default class BiliUtils {

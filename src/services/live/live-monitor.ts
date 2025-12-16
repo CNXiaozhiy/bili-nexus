@@ -1,7 +1,7 @@
 import EventEmitter from "events";
-import BiliApiService from "../bili-api";
+import { BiliAccount } from "@/core/bilibili/bili-account";
 import BiliUtils from "@/utils/bili";
-import { LiveRoomInfo, LiveRoomStatus } from "@/types/bili";
+import { LiveRoomInfo, LiveRoomStatus } from "@/types/bilibili";
 import getLogger from "@/utils/logger";
 
 const logger = getLogger("LiveMonitor");
@@ -29,6 +29,8 @@ export default class LiveMonitor extends EventEmitter<LiveMonitorEvents> {
   public slideshowAsEnd: boolean;
   public interval: number;
 
+  private readonly biliAccount: BiliAccount;
+
   private lastLiveStatus: LiveRoomStatus | null = null;
   private lastLiveHash: string | null = null;
   private lastRoomInfo: LiveRoomInfo | null = null;
@@ -38,20 +40,19 @@ export default class LiveMonitor extends EventEmitter<LiveMonitorEvents> {
 
   private checkIntervalId?: NodeJS.Timeout;
 
-  constructor(options: LiveMonitorOptions) {
+  constructor(options: LiveMonitorOptions, biliAccount: BiliAccount) {
     super();
     this.roomId = options.roomId;
+    this.biliAccount = biliAccount;
     this.slideshowAsEnd = !!options.slideshowAsEnd;
     this.interval = options.interval ?? 10000;
   }
 
   public async poll() {
     try {
-      const roomInfo =
-        await BiliApiService.getDefaultInstance().getLiveRoomInfo(
-          this.roomId,
-          true
-        );
+      const roomInfo = await this.biliAccount
+        .getBiliApi()
+        .getLiveRoomInfo(this.roomId, true);
 
       if (roomInfo.live_status === this.lastLiveStatus)
         return roomInfo.live_status;

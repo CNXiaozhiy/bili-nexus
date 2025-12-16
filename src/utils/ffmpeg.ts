@@ -1,23 +1,24 @@
 import Ffmpeg from "@/core/ffmpeg";
-import { BiliApi } from "@/services/bili-api";
-import { LiveRoomStatus } from "@/types/bili";
+import { LiveRoomStatus } from "@/types/bilibili";
+import { IBiliHttpApi } from "@/types/bilibili/bili-http-api";
 import fs from "fs";
 import path from "path";
 
 const tempDir = path.join(process.cwd(), "temp");
 fs.mkdirSync(tempDir, { recursive: true });
 
+interface IBiliApi {}
+
 export async function screenshotSync(
   roomId: number | string,
-  biliApiInstance: BiliApi
+  biliApi: IBiliHttpApi
 ) {
   if (
-    (await biliApiInstance.getLiveRoomInfo(roomId)).live_status !==
-    LiveRoomStatus.LIVE
+    (await biliApi.getLiveRoomInfo(roomId)).live_status !== LiveRoomStatus.LIVE
   ) {
     throw new Error("直播间未开播");
   }
-  const urls = await biliApiInstance.getLiveStreamUrl(roomId);
+  const urls = await biliApi.getLiveStreamUrl(roomId);
   const outputFilePath = path.join(tempDir, `${Date.now()}.png`);
   const resp = await Ffmpeg.screenshotSync(urls[0], outputFilePath, {
     userAgent:

@@ -6,9 +6,9 @@ import {
   biliConfigManager,
   liveConfigManager,
 } from "@/common";
-import BiliApiService from "../bili-api";
+import BiliAccountService from "../account/bili-account-service";
 import getLogger from "@/utils/logger";
-import { LiveRoomInfo, LiveRoomStatus, UserCard } from "@/types/bili";
+import { LiveRoomInfo, LiveRoomStatus, UserCard } from "@/types/bilibili";
 import { UploadOptions as CustomOptions } from "@/common/config";
 import BiliUtils from "@/utils/bili";
 import DiskSpaceMonitor from "../system/disk-space-monitor";
@@ -18,6 +18,8 @@ import FormatUtils from "@/utils/format";
 import { getVersion } from "../version";
 
 const logger = getLogger("LiveAutomationManager");
+
+export class CustomBiliAccountNotFound extends Error {}
 
 export interface RoomManageOptions {
   autoRecord: boolean;
@@ -161,10 +163,13 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
     this.rooms.add(roomId);
 
-    const liveMonitor = new LiveMonitor({
-      roomId: roomId,
-      slideshowAsEnd: biliConfigManager.get("slideshowAsEnd"),
-    });
+    const liveMonitor = new LiveMonitor(
+      {
+        roomId: roomId,
+        slideshowAsEnd: biliConfigManager.get("slideshowAsEnd"),
+      },
+      BiliAccountService.getDefault()
+    );
 
     this.liveMonitors.set(roomId, liveMonitor);
 
@@ -272,8 +277,9 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       logger.info(`房间 ${roomId} 准备录制`);
     }
 
-    const inputUrls =
-      await BiliApiService.getDefaultInstance().getLiveStreamUrl(roomId);
+    const inputUrls = await BiliAccountService.getDefault()
+      .getBiliApi()
+      .getLiveStreamUrl(roomId);
     const inputUrl = inputUrls[0];
     const recorder = new LiveRecorder(
       hash,
@@ -330,7 +336,8 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       logger.error(`房间 ${roomId} 录制失败: ${err}`);
       logger.debug("尝试更换直播流");
 
-      BiliApiService.getDefaultInstance()
+      BiliAccountService.getDefault()
+        .getBiliApi()
         .getLiveStreamUrl(roomId)
         .then((urls) => {
           recorder.updateInputUrl(urls[0]);
@@ -449,10 +456,16 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
   private async upload(options: UploadOptions) {
     const { hash, file, roomInfo, live, recorder, customOptions } = options;
     logger.debug(`采用投稿账号 -> ${customOptions?.account || "默认账号"}`);
-    const biliApiInstance = customOptions?.account
-      ? BiliApiService.getInstance(customOptions.account)
-      : BiliApiService.getDefaultInstance();
-    const userCard = await biliApiInstance.getUserCard(roomInfo.uid);
+    const biliAccount = customOptions?.account
+      ? BiliAccountService.getBiliAccount(customOptions.account)
+      : BiliAccountService.getDefault();
+
+    if (!biliAccount) {
+      throw new CustomBiliAccountNotFound();
+    }
+
+    const biliApi = biliAccount.getBiliApi();
+    const userCard = await biliApi.getUserCard(roomInfo.uid);
     const userName = userCard.card.name; // UP主 名字
 
     if (!live.startTime) throw new Error("开播时间未知");
@@ -499,7 +512,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       `本场直播 Hash: ${hash.substring(0, 7)}\n` +
       `由 Bili-Nexus v${getVersion()} 系统全自动录制`;
 
-    const uploader = new VideoUploader(hash.substring(0, 7), biliApiInstance, {
+    const uploader = new VideoUploader(hash.substring(0, 7), biliAccount, {
       videos: [{ filePath: file, title: "", desc: "" }],
       videoInfo: {
         title: customOptions?.title || title,
@@ -560,8 +573,9 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       if (shouldUpload) {
         const resp = await recorder.stopRecordAndMerge();
         // 手动获取直播间信息
-        const roomInfo =
-          await BiliApiService.getDefaultInstance().getLiveRoomInfo(roomId);
+        const roomInfo = await BiliAccountService.getDefault()
+          .getBiliApi()
+          .getLiveRoomInfo(roomId);
 
         const liveStartTime = new Date(roomInfo.live_time).getTime();
 

@@ -148,4 +148,49 @@ export default class FormatUtils {
 
     return `${month}.${day} ${session}`;
   }
+
+  /**
+   * 格式化错误信息为文本格式
+   * @param type 错误类型
+   * @param error 错误对象或原因
+   * @param promise 仅用于unhandledRejection的Promise对象
+   * @returns 格式化后的错误文本
+   */
+  static formatErrorMessage(
+    type: string,
+    error: Error | any,
+    promise: Promise<any> | null = null
+  ) {
+    const timestamp = new Date().toISOString();
+    let message = `错误类型: ${type}\n`;
+    message += `出错时间: ${timestamp}\n`;
+
+    if (error instanceof Error) {
+      message += `错误名称: ${error.name}\n`;
+      message += `错误信息: ${error.message}\n`;
+      message += `错误堆栈:\n${error.stack || "无堆栈信息"}\n`;
+
+      if (Object.keys(error).length > 0) {
+        const extraProps = Object.entries(error)
+          .filter(([key]) => !["name", "message", "stack"].includes(key))
+          .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+          .join("\n");
+        if (extraProps) {
+          message += `额外属性:\n${extraProps}\n`;
+        }
+      }
+    } else {
+      message += `错误内容: ${JSON.stringify(error, null, 2)}\n`;
+    }
+
+    if (type === "unhandledRejection" && promise) {
+      message += `Promise状态: ${promise}\n`;
+    }
+
+    message += `运行环境: Node.js ${process.version}\n`;
+    message += `工作目录: ${process.cwd()}\n`;
+    message += `内存使用: ${JSON.stringify(process.memoryUsage())}\n`;
+
+    return message;
+  }
 }

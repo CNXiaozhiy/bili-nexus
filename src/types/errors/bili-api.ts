@@ -13,10 +13,3 @@ export class BiliHttpApiError extends Error {
     this.raw_data = raw_data;
   }
 }
-
-export class BiliApiServiceError extends BiliApiError {
-  constructor(message: string) {
-    super(message);
-    this.name = "BiliApiServiceError";
-  }
-}

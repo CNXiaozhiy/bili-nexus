@@ -1,7 +1,7 @@
 import EventEmitter from "events";
-import BiliApiService from "../bili-api";
 import getLogger from "@/utils/logger";
-import { SpaceDynamicItem } from "@/types/bili";
+import { SpaceDynamicItem } from "@/types/bilibili";
+import BiliAccountService from "../account/bili-account-service";
 
 const logger = getLogger("SpaceDynamicMonitor");
 
@@ -30,11 +30,9 @@ export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonito
 
   public async poll() {
     try {
-      const { data: spaceDynamic } =
-        await BiliApiService.getDefaultInstance().getSpaceDynamic(
-          this.mid,
-          true
-        );
+      const { data: spaceDynamic } = await BiliAccountService.getDefault()
+        .getBiliApi()
+        .getSpaceDynamic(this.mid, true);
       let item = spaceDynamic.items[0];
       if (item.modules.module_tag && item.modules.module_tag.text === "置顶")
         item = spaceDynamic.items[1];

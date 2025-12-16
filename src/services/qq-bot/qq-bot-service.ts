@@ -8,7 +8,7 @@ import {
   SegmentMessage,
   SegmentMessages,
 } from "@/types/one-bot";
-import { LiveRoomInfo, LiveRoomStatus } from "@/types/bili";
+import { LiveRoomInfo, LiveRoomStatus } from "@/types/bilibili";
 import { QQBotError, QQBotServiceSetupError } from "@/types/errors/qq-bot";
 import getLogger from "@/utils/logger";
 import LiveAutomationManager, {
@@ -26,12 +26,12 @@ import SpaceDynamicMonitor from "../dynamic/space-dynamic-monitor";
 import HtmlTemplatesRender from "./html-template-render";
 import CommandProcessor from "@/utils/command-processor";
 import FormatUtils from "@/utils/format";
-import BiliApiService from "../bili-api";
+import BiliAccountService from "../account/bili-account-service";
 import notifyEmitter from "../system/notify-emitter";
 import VideoUploader from "../video/video-uploader";
 import { DataStore } from "@/common/config";
 import { screenshotSync } from "@/utils/ffmpeg";
-import { loginAccount } from "../acc/login";
+import { loginAccount } from "@/core/bilibili/account-login";
 import BiliUtils from "@/utils/bili";
 
 const logger = getLogger("QQBotService");
@@ -244,9 +244,9 @@ export default class QQBotService {
     const subscribeUser = async (qid: number, gid: number, mid: number) => {
       let _messages: [string, string] = ["", ""];
 
-      const userInfo = await BiliApiService.getDefaultInstance().getUserInfo(
-        mid
-      );
+      const userInfo = await BiliAccountService.getDefault()
+        .getBiliApi()
+        .getUserInfo(mid);
 
       const roomId = userInfo.live_room.roomid;
 
@@ -375,9 +375,9 @@ export default class QQBotService {
     const initUser = async (mid: number) => {
       let _messages: [string, string] = ["", ""];
 
-      const userInfo = await BiliApiService.getDefaultInstance().getUserInfo(
-        mid
-      );
+      const userInfo = await BiliAccountService.getDefault()
+        .getBiliApi()
+        .getUserInfo(mid);
 
       const roomId = userInfo.live_room.roomid;
 
@@ -617,7 +617,7 @@ export default class QQBotService {
       }
 
       const messages: SegmentMessages = [];
-      const biliApi = BiliApiService.getDefaultInstance();
+      const biliApi = BiliAccountService.getDefault().getBiliApi();
 
       for (const _roomId of rooms) {
         const roomInfo = await biliApi.getLiveRoomInfo(_roomId);
@@ -786,7 +786,7 @@ export default class QQBotService {
         return "您在本群暂无订阅";
       }
 
-      const biliApi = BiliApiService.getDefaultInstance();
+      const biliApi = BiliAccountService.getDefault().getBiliApi();
 
       const result: SegmentMessages = [];
 
@@ -847,9 +847,9 @@ export default class QQBotService {
 
       const mid = parseInt(args[0]);
 
-      const userInfo = await BiliApiService.getDefaultInstance().getUserInfo(
-        mid
-      );
+      const userInfo = await BiliAccountService.getDefault()
+        .getBiliApi()
+        .getUserInfo(mid);
 
       if (
         userInfo.live_room.roomStatus === 0 ||
@@ -1101,7 +1101,7 @@ export default class QQBotService {
         },
       })
         .then(async (userAccount) => {
-          const biliApi = BiliApiService.register(userAccount);
+          const biliApi = BiliAccountService.register(userAccount).getBiliApi();
           const accountInfo = await biliApi.getAccountInfo();
           context.reply([
             OneBotMessageUtils.UrlImage(accountInfo.face),

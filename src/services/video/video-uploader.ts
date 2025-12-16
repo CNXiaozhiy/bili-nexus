@@ -1,10 +1,11 @@
 import BiliUtils from "@/utils/bili";
-import { BiliApi } from "../bili-api";
+import { BiliAccount } from "@/core/bilibili/bili-account";
 import fs from "fs";
 import path from "path";
 import pLimit from "p-limit";
 import getLogger from "@/utils/logger";
 import EventEmitter from "events";
+import BiliApi from "@/core/bilibili/bili-api";
 
 export interface VideoInfo {
   title: string;
@@ -58,12 +59,15 @@ export default class VideoUploader extends EventEmitter<{
   private duration = 0; // 总耗时
   private tasks: Task[][] = []; // 0 视频为主投稿，自 1 开始
 
+  private readonly biliApi: BiliApi;
+
   constructor(
     private readonly name: string,
-    private readonly biliApiInstance: BiliApi,
+    private readonly biliAccount: BiliAccount,
     private readonly options: VideoUploaderOptions
   ) {
     super();
+    this.biliApi = biliAccount.getBiliApi();
   }
 
   public async upload(): Promise<DoneResponse> {
@@ -137,7 +141,7 @@ export default class VideoUploader extends EventEmitter<{
 
         task = pushTask("预上传");
 
-        const preuploadResp = await this.biliApiInstance.preuploadVideo({
+        const preuploadResp = await this.biliApi.preuploadVideo({
           fileName,
           fileSize,
         });
@@ -171,7 +175,7 @@ export default class VideoUploader extends EventEmitter<{
 
         task = pushTask("获取上传元数据");
 
-        const { upload_id: uploadId } = await this.biliApiInstance.getUploadID({
+        const { upload_id: uploadId } = await this.biliApi.getUploadID({
           uploadUrl,
           fileSize,
           partSize: chunkSize,
@@ -195,7 +199,7 @@ export default class VideoUploader extends EventEmitter<{
           uploadChunkTasks.push(
             limit(async () => {
               try {
-                const resp = await this.biliApiInstance.uploadChunk({
+                const resp = await this.biliApi.uploadChunk({
                   filePath,
                   fileSize,
                   auth,
@@ -245,7 +249,7 @@ export default class VideoUploader extends EventEmitter<{
 
         task = pushTask("校验结果");
 
-        const validateVideoResp = await this.biliApiInstance.validateVideo({
+        const validateVideoResp = await this.biliApi.validateVideo({
           uploadUrl,
           fileName,
           auth,
@@ -269,7 +273,7 @@ export default class VideoUploader extends EventEmitter<{
       task = pushTask("上传封面");
 
       const coverUrl = videoInfo.coverBase64
-        ? (await this.biliApiInstance.uploadCover(videoInfo.coverBase64)).url
+        ? (await this.biliApi.uploadCover(videoInfo.coverBase64)).url
         : videoInfo.cover;
 
       task.success();
@@ -278,7 +282,7 @@ export default class VideoUploader extends EventEmitter<{
 
       task = pushTask("正式投稿");
 
-      const resp = await this.biliApiInstance.uploadVideo({
+      const resp = await this.biliApi.uploadVideo({
         cover: coverUrl,
         title: videoInfo.title,
         copyright: 1,
@@ -321,7 +325,7 @@ export default class VideoUploader extends EventEmitter<{
         task = pushTask("添加至合集");
 
         logger.info(`即将添加至合集 ->`, videoInfo.season);
-        let seasonResp = await this.biliApiInstance.getSeasons({
+        let seasonResp = await this.biliApi.getSeasons({
           page: 1,
           pageNumber: 30,
         });
@@ -348,7 +352,7 @@ export default class VideoUploader extends EventEmitter<{
 
           if (!season && videoInfo.season.name && videoInfo.season.autoCreate) {
             logger.info(`合集 ${videoInfo.season.name} 不存在, 开始自动创建`);
-            const { data: seasonId } = await this.biliApiInstance.addSeason({
+            const { data: seasonId } = await this.biliApi.addSeason({
               title: videoInfo.season.name,
               cover: videoInfo.season.autoCreate.cover,
               desc: videoInfo.season.autoCreate.desc || "",
@@ -356,7 +360,7 @@ export default class VideoUploader extends EventEmitter<{
             logger.info(`合集创建成功, 合集ID:`, seasonId);
 
             // 重新获取
-            seasonResp = await this.biliApiInstance.getSeasons({
+            seasonResp = await this.biliApi.getSeasons({
               page: 1,
               pageNumber: 30,
             });
@@ -409,7 +413,7 @@ export default class VideoUploader extends EventEmitter<{
     episode: { aid: number; cid: number; title: string }
   ) {
     const { aid, cid, title } = episode;
-    const resp = await this.biliApiInstance.addSeasonEpisodes({
+    const resp = await this.biliApi.addSeasonEpisodes({
       episodes: [
         {
           aid,

@@ -11,9 +11,9 @@ import { initVersion, getVersion } from "./services/version";
 import Ffmpeg from "./core/ffmpeg";
 import { deleteFolderRecursive, isFolderEmpty } from "./utils/file";
 import LiveAutomationManager from "./services/live/live-automation-manager";
-import BiliApiService from "./services/bili-api";
+import BiliAccountService from "./services/account/bili-account-service";
 import UserAccount from "./core/bilibili/account";
-import { loginAccountByConsole } from "./services/acc/login";
+import { loginAccountByConsole } from "./core/bilibili/account-login";
 import QQBotService from "./services/qq-bot/qq-bot-service";
 import DynamicAutomationManager from "./services/dynamic/dynamic-automation-manager";
 import { existsSync, mkdirSync } from "fs";
@@ -114,15 +114,19 @@ export class App {
       // 登录默认账号
       try {
         const userAccount = await loginAccountByConsole(true);
-        BiliApiService.registerDefault(userAccount);
+        BiliAccountService.registerDefault(userAccount);
       } catch (e) {
         logger.error("登录失败", e);
         process.exit(1);
       }
     } else {
       // 注册默认账号
-      BiliApiService.registerDefault(
-        new UserAccount(defaultAccount, accounts[defaultAccount].cookie)
+      BiliAccountService.registerDefault(
+        new UserAccount(
+          defaultAccount,
+          accounts[defaultAccount].cookie,
+          accounts[defaultAccount].refresh_token
+        )
       );
 
       // 设置 SESSDATA
@@ -152,7 +156,9 @@ export class App {
     for (const uid in accounts) {
       if (parseInt(uid) === defaultAccount) continue;
       const account = accounts[uid];
-      BiliApiService.register(new UserAccount(parseInt(uid), account.cookie));
+      BiliAccountService.register(
+        new UserAccount(parseInt(uid), account.cookie, account.refresh_token)
+      );
     }
 
     logger.debug("BiliApiService 初始化完成");
@@ -223,66 +229,25 @@ const app = new App();
 app.run().then(() => logger.info("App 启动成功✅"));
 
 import notifyEmitter from "./services/system/notify-emitter";
+import FormatUtils from "./utils/format";
 
 if (true) {
   process.on("uncaughtException", (error) => {
-    const errorMessage = formatErrorMessage("uncaughtException", error);
+    const errorMessage = FormatUtils.formatErrorMessage(
+      "uncaughtException",
+      error
+    );
     notifyEmitter.emit("msg-error", errorMessage);
   });
 
   process.on("unhandledRejection", (reason, promise) => {
-    const errorMessage = formatErrorMessage(
+    const errorMessage = FormatUtils.formatErrorMessage(
       "unhandledRejection",
       reason,
       promise
     );
     notifyEmitter.emit("msg-error", errorMessage);
   });
-
-  /**
-   * 格式化错误信息为文本格式
-   * @param type 错误类型
-   * @param error 错误对象或原因
-   * @param promise 仅用于unhandledRejection的Promise对象
-   * @returns 格式化后的错误文本
-   */
-  function formatErrorMessage(
-    type: string,
-    error: Error | any,
-    promise: Promise<any> | null = null
-  ) {
-    const timestamp = new Date().toISOString();
-    let message = `错误类型: ${type}\n`;
-    message += `出错时间: ${timestamp}\n`;
-
-    if (error instanceof Error) {
-      message += `错误名称: ${error.name}\n`;
-      message += `错误信息: ${error.message}\n`;
-      message += `错误堆栈:\n${error.stack || "无堆栈信息"}\n`;
-
-      if (Object.keys(error).length > 0) {
-        const extraProps = Object.entries(error)
-          .filter(([key]) => !["name", "message", "stack"].includes(key))
-          .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
-          .join("\n");
-        if (extraProps) {
-          message += `额外属性:\n${extraProps}\n`;
-        }
-      }
-    } else {
-      message += `错误内容: ${JSON.stringify(error, null, 2)}\n`;
-    }
-
-    if (type === "unhandledRejection" && promise) {
-      message += `Promise状态: ${promise}\n`;
-    }
-
-    message += `运行环境: Node.js ${process.version}\n`;
-    message += `工作目录: ${process.cwd()}\n`;
-    message += `内存使用: ${JSON.stringify(process.memoryUsage())}\n`;
-
-    return message;
-  }
 }
 
 export default app;
