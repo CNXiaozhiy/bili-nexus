@@ -1359,9 +1359,7 @@ export default class QQBotService {
         return;
       }
 
-      logger.debug(
-        `开始动态通知 -> 用户 ${mid}, 群组: ${userConfig.group}, 动态ID: ${dynamicId}`
-      );
+      logger.debug(`开始动态通知 -> 用户 ${mid}, 动态ID: ${dynamicId}`);
 
       Object.entries(notifyGroups).forEach(async ([_gid, group]) => {
         const gid = parseInt(_gid);

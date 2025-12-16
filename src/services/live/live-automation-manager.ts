@@ -468,9 +468,11 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     const userCard = await biliApi.getUserCard(roomInfo.uid);
     const userName = userCard.card.name; // UP主 名字
 
-    if (!live.startTime) throw new Error("开播时间未知");
+    // if (!live.startTime) throw new Error("开播时间未知");
 
-    const session = FormatUtils.formatDateWithSession(new Date(live.startTime));
+    const session = live.startTime
+      ? FormatUtils.formatDateWithSession(new Date(live.startTime))
+      : "";
 
     const title = `【${userName}】${session} - ${roomInfo.title}`;
 
