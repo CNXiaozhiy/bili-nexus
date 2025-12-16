@@ -144,7 +144,7 @@ export default class QQBotService {
         logger.error("未配置 superAdmin, 通知失败, 请尽快处理!");
         return;
       }
-      const msg = `BiliLiveHub System 警告通知⚠️\n\n时间: ${new Date().toISOString()}\n\n${message}`;
+      const msg = `BiliNexus 警告通知⚠️\n\n时间: ${new Date().toISOString()}\n\n${message}`;
       this.bot?.sendPrivate(superAdmin, [OneBotMessageUtils.Text(msg)]);
     });
 
@@ -155,7 +155,7 @@ export default class QQBotService {
         logger.error("未配置 superAdmin, 通知失败, 请尽快处理!");
         return;
       }
-      const msg = `BiliLiveHub System 致命错误🆘\n\n时间: ${new Date().toISOString()}\n\n${message}`;
+      const msg = `BiliNexus 致命错误🆘\n\n时间: ${new Date().toISOString()}\n\n${message}`;
       this.bot?.sendPrivate(superAdmin, [OneBotMessageUtils.Text(msg)]);
     });
   }

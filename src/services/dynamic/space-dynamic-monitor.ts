@@ -44,7 +44,9 @@ export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonito
       }
 
       if (this.lastDynamicId && this.lastDynamicId !== dynamicId) {
-        logger.info(`检测到动态更新, ${this.mid} -> 的最新动态ID ${dynamicId}`);
+        logger.debug(
+          `检测到动态更新, ${this.mid} 的最新动态, LN: ${this.lastDynamicId} -> ${dynamicId}, 发布于: ${item.modules.module_author.pub_time}`
+        );
         if (this.lastDynamicPubTs === item.modules.module_author.pub_ts) {
           // 仅 ID 变化
           logger.warn(
@@ -52,6 +54,9 @@ export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonito
           );
           logger.warn("该动态发布于: " + item.modules.module_author.pub_time);
         } else {
+          logger.info(
+            `检测到 ${this.mid} 的最新动态 -> ${dynamicId}, 发布于: ${item.modules.module_author.pub_time}`
+          );
           this.emit("new", dynamicId, item);
         }
       }
