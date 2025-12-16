@@ -1396,22 +1396,9 @@ export default class QQBotService {
           ),
         ]);
 
-        if (
-          Math.floor(Date.now() / 1000) -
-            parseInt(dynamic.modules.module_author.pub_ts as any) >
-          60 * 60
-        ) {
-          logger.warn(
-            `动态过久，停止通知 :`,
-            Math.floor(Date.now() / 1000) -
-              parseInt(dynamic.modules.module_author.pub_ts as any)
-          );
-          return;
-        }
-
         await this.bot.sendGroup(gid, [
           OneBotMessageUtils.Text(
-            `UP发布新动态啦\n发布时间: ${dynamic.modules.module_author.pub_time}`
+            `UP发布新动态啦\n发布于: ${dynamic.modules.module_author.pub_time}`
           ),
           ...atSegmentMessage,
         ]);

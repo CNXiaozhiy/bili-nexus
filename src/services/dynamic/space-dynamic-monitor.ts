@@ -20,6 +20,7 @@ export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonito
 
   private checkIntervalId?: NodeJS.Timeout;
   private lastDynamicId: string = "";
+  private lastDynamicPubTs: number = 0;
 
   constructor(options: SpaceDynamicMonitorOptions) {
     super();
@@ -45,11 +46,20 @@ export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonito
       }
 
       if (this.lastDynamicId && this.lastDynamicId !== dynamicId) {
-        logger.info(`检测到新动态, ${this.mid} ->  的最新动态 ${dynamicId}`);
-        this.emit("new", dynamicId, item);
+        logger.info(`检测到动态更新, ${this.mid} -> 的最新动态ID ${dynamicId}`);
+        if (this.lastDynamicPubTs === item.modules.module_author.pub_ts) {
+          // 仅 ID 变化
+          logger.warn(
+            "检测到最新动态ID变化但pub_ts未变化，判定为动态ID调整而非新动态发布"
+          );
+          logger.warn("该动态发布于: " + item.modules.module_author.pub_time);
+        } else {
+          this.emit("new", dynamicId, item);
+        }
       }
 
       this.lastDynamicId = dynamicId;
+      this.lastDynamicPubTs = item.modules.module_author.pub_ts;
     } catch (e) {}
   }
 
