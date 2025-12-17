@@ -295,7 +295,10 @@ export default class VideoUploader extends EventEmitter<{
             description: videoInfo.desc,
             cover_url: coverUrl,
           });
-          tags = resp.map((item) => item.tag).join(",");
+          tags = resp
+            .slice(0, 6)
+            .map((item) => item.tag)
+            .join(",");
           logger.info("投稿标签预测成功 ✅ ->", tags);
         } catch (e) {
           logger.warn("投稿标签预测失败", e);

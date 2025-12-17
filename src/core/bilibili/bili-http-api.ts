@@ -610,7 +610,12 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
     const resp = await request.get<
       Response<{ tag: string; checked: number; request_id: string }[]>
     >(
-      `https://member.bilibili.com/x/vupre/web/tag/recommend?${params.toString()}`
+      `https://member.bilibili.com/x/vupre/web/tag/recommend?${params.toString()}`,
+      {
+        headers: {
+          cookie: this.getCookie(),
+        },
+      }
     );
 
     checkResponseCode(resp.data);
