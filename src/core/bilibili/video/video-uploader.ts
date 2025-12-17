@@ -11,7 +11,7 @@ export interface VideoInfo {
   cover: string; // url
   coverBase64?: string; // base64
   tid: number;
-  tag: string;
+  tag?: string;
   desc: string;
   season?: {
     sectionId?: number; // 合集小节ID
@@ -83,6 +83,8 @@ export default class VideoUploader extends EventEmitter<{
 
     const biliFileNames: string[] = [];
     const bizIds: number[] = []; // cids
+
+    let _uploadId = ""; // 用于投稿标签预测
 
     interface TaskActions {
       success(message?: string): void;
@@ -182,6 +184,8 @@ export default class VideoUploader extends EventEmitter<{
           auth,
         });
 
+        if (!_uploadId) _uploadId = uploadId;
+
         task.success();
 
         logger.info(
@@ -279,6 +283,27 @@ export default class VideoUploader extends EventEmitter<{
 
       logger.info(`投稿器[${this.name}] -> 视频 上传封面完成: ${coverUrl}`);
 
+      task = pushTask("投稿标签预测");
+
+      let tags = videoInfo.tag;
+
+      if (!tags) {
+        try {
+          const resp = await this.biliApi.getRecommendTags({
+            upload_id: _uploadId,
+            title: videoInfo.title,
+            description: videoInfo.desc,
+            cover_url: coverUrl,
+          });
+          tags = resp.map((item) => item.tag).join(",");
+          logger.info("投稿标签预测成功 ✅ ->", tags);
+        } catch (e) {
+          logger.warn("投稿标签预测失败", e);
+        }
+      }
+
+      task.success();
+
       task = pushTask("正式投稿");
 
       const resp = await this.biliApi.uploadVideo({
@@ -286,7 +311,7 @@ export default class VideoUploader extends EventEmitter<{
         title: videoInfo.title,
         copyright: 1,
         tid: videoInfo.tid,
-        tag: videoInfo.tag,
+        tag: tags,
         desc_format_id: 0,
         desc: videoInfo.desc,
         recreate: -1,

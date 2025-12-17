@@ -598,6 +598,26 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
     return resp.data.data;
   }
 
+  async getRecommendTags(options: {
+    upload_id?: string;
+    subtype_id?: string;
+    title?: string;
+    filename?: string;
+    description?: string;
+    cover_url?: string;
+  }) {
+    const params = new URLSearchParams(options);
+    const resp = await request.get<
+      Response<{ tag: string; checked: number; request_id: string }[]>
+    >(
+      `https://member.bilibili.com/x/vupre/web/tag/recommend?${params.toString()}`
+    );
+
+    checkResponseCode(resp.data);
+
+    return resp.data.data;
+  }
+
   async addSeason(options: { title: string; desc: string; cover?: string }) {
     const csrf = BiliUtils.getCSRF(this.getCookie());
     const resp = await request.post<Response<number>>(

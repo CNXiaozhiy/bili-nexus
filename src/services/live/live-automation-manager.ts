@@ -522,7 +522,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
         desc: customOptions?.desc || desc,
         cover: customOptions?.cover || roomInfo.keyframe,
         tid: customOptions?.tid || 27,
-        tag: customOptions?.tag || "直播录像",
+        tag: customOptions?.tag,
         season: {
           name: userName,
           autoCreate: {},
