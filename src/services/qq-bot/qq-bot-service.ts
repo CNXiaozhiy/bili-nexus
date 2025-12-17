@@ -1397,7 +1397,7 @@ export default class QQBotService {
 
         await this.bot.sendGroup(gid, [
           OneBotMessageUtils.Text(
-            `UP发布新动态啦\n发布于: ${dynamic.modules.module_author.pub_time}`
+            `UP发布新动态啦\n发布于: ${dynamic.modules.module_author.pub_time}\n\n`
           ),
           ...atSegmentMessage,
         ]);
