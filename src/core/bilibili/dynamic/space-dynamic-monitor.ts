@@ -50,18 +50,9 @@ export default class SpaceDynamicMonitor extends EventEmitter<SpaceDynamicMonito
       const pubTs = parseInt(item.modules.module_author.pub_ts);
 
       if (this.lastDynamicId && this.lastDynamicId !== dynamicId) {
-        // Debug
-        if (Math.floor(Date.now() / 1000) - pubTs >= 10 * 60) {
-          logger.warn("检测到发布时间晚于现在10分钟的动态");
-          logger.debug("lastDynamicId ->", this.lastDynamicId);
-          logger.debug("currentDynamicId ->", dynamicId);
-          logger.debug("lastDynamicPubTs ->", this.lastDynamicPubTs);
-          logger.debug(
-            "currentDynamicPubTs ->",
-            item.modules.module_author.pub_ts
-          );
-          logger.debug("PubTime ->", item.modules.module_author.pub_time);
-        }
+        logger.info(
+          `检测到 ${this.mid} 动态更新, ${this.lastDynamicId} -> ${dynamicId}`
+        );
         if (pubTs <= this.lastDynamicPubTs) {
           // 动态发布的比上一次的最新的动态还早，可能发生了删除动态动作
           logger.warn(
