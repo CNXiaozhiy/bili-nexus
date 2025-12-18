@@ -1329,8 +1329,7 @@ export default class QQBotService {
   ) {
     spaceDynamicMonitor.on("new", (dynamicId, dynamic) => {
       logger.debug(
-        `收到 spaceDynamicMonitor 的事件 -> new, mid: ${mid}, dynamicId: ${dynamicId}, dynamic:`,
-        dynamic
+        `收到 spaceDynamicMonitor 的事件 -> new, mid: ${mid}, dynamicId: ${dynamicId}`
       );
 
       if (
