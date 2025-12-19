@@ -11,6 +11,14 @@ interface ExtendedAxiosRequestConfig extends AxiosRequestConfig {
   shouldRetry?: (response: AxiosResponse) => boolean | Promise<boolean>;
 }
 
+class GetConfigError extends Error {
+  error: Error;
+  constructor(message: string, error: Error) {
+    super(message);
+    this.error = error;
+  }
+}
+
 const apiThrottle = throttledQueue({
   maxPerInterval: 5,
   interval: 1000,
@@ -79,7 +87,15 @@ async function retryRequest<T>(
   retryCount: number = 0
 ): Promise<AxiosResponse<T>> {
   try {
-    const config = await getConfig();
+    let config:
+      | ExtendedAxiosRequestConfig
+      | Promise<ExtendedAxiosRequestConfig>;
+    try {
+      config = await getConfig();
+    } catch (e) {
+      throw new GetConfigError("获取请求配置失败", e as Error);
+    }
+
     const response = await instance.request<T>(config);
     if (config.shouldRetry && config.shouldRetry(response)) {
       const delayTime = calculateBackoffDelay(retryCount);
@@ -100,6 +116,10 @@ async function retryRequest<T>(
 
     return response;
   } catch (error) {
+    if (error instanceof GetConfigError) {
+      logger.error(`获取请求配置失败 ❌`, error);
+    }
+
     const axiosError = error as AxiosError;
     const config = await getConfig();
 

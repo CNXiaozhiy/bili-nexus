@@ -73,6 +73,10 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
   private waitingForRestartRecordTask = new Set<string>(); // 直播Hash
 
+  // 状态锁，防止并发清理
+  private processingHashes = new Set<string>(); // 正在处理的Hash
+  private hashLocks = new Map<string, Promise<void>>(); // Hash级别的锁
+
   constructor(private readonly biliAccount: BiliAccount) {
     super();
 
@@ -385,73 +389,98 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       this.recordTimeouts.delete(hash);
     }
 
-    // 是否仍然位于等待队列
-    if (this.waitingForRestartRecordTask.delete(hash)) {
-      // 录制已经投稿，后续操作已经没有意义
-      logger.warn(
-        `本场直播 ${hash} 仍位于等待重启的投稿任务中, 将放弃剩余事务`
-      );
-      logger.debug(`由于直播已结束, 删除等待重启的投稿任务 -> ${hash}`);
+    // 检查是否正在被处理（防止并发清理）
+    if (this.processingHashes.has(hash)) {
+      logger.info(`hash ${hash} 正在被处理中，等待处理完成后再继续LiveEnd事务`);
 
-      const recorder = this.liveRecorders.get(hash);
-      if (recorder) {
-        this.clearRecording(hash, true); // 此时的 deleteFile = true 无意义，但为了以防万一
-        logger.debug(`清理负责 ${hash} 的录制器完成 ✅`);
+      // 等待当前 hashLock 处理完成
+      const lock = this.hashLocks.get(hash);
+      if (lock) {
+        logger.debug(`等待hash ${hash} 的当前 HashLock 处理完成`);
+        await lock;
+        logger.debug(`${hash} 的hashLock 已解锁🔓，继续LiveEnd事务`);
+      } else {
+        logger.debug(
+          `hash ${hash} 正在被处理中，却不存在HashLock，说明可能处理已结束但标记未清除`
+        );
+      }
+      this.processingHashes.delete(hash);
+    }
+
+    try {
+      // 标记为正在处理
+      this.processingHashes.add(hash);
+
+      // 是否仍然位于等待队列
+      if (this.waitingForRestartRecordTask.has(hash)) {
+        logger.info(`本场直播 ${hash} 仍位于等待队列，清理录制器`);
+        const recorder = this.liveRecorders.get(hash);
+        if (recorder) {
+          this.clearRecording(hash, true); // deleteFile = true 正常情况无意义
+          logger.debug(`清理负责 ${hash} 的录制器完成 ✅`);
+        }
+
+        logger.debug("liveMonitor.event.live-end's Handler -> 放弃剩余事务");
+        return;
       }
 
-      logger.debug("liveMonitor.event.live-end's Handler -> 放弃剩余事务");
-      return;
-    }
+      const liveStartTime = new Date(roomInfo.live_time).getTime();
+      const liveStopTime = Date.now();
 
-    const liveStartTime = new Date(roomInfo.live_time).getTime();
-    const liveStopTime = Date.now();
+      const recorder = this.liveRecorders.get(hash);
 
-    const recorder = this.liveRecorders.get(hash);
+      if (!recorder) {
+        logger.debug(
+          `未找到 ${hash} 的录制器, liveMonitor.event.live-end's Handler -> 放弃剩余事务`
+        );
+        return;
+      }
 
-    if (!recorder) {
-      logger.debug(
-        `未找到 ${hash} 的录制器, liveMonitor.event.live-end's Handler -> 放弃剩余事务`
+      logger.info(
+        `房间 ${roomId} 开始停止录制, ${hash} 录制器 -> stopRecord()`
       );
-      return;
+
+      if (!recorder.isRunning()) {
+        logger.debug(`WARN: ${hash} 的录制器未在录制`);
+      }
+
+      const resp = await recorder.stopRecordAndMerge();
+
+      const customOptions =
+        liveConfigManager.get("rooms")[roomId]?.uploadOptions;
+
+      if (roomManageOptions.autoUpload) {
+        logger.info(`房间 ${roomId} 开始自动投稿`);
+        await this.upload({
+          hash,
+          file: resp.file,
+          roomInfo,
+          live: {
+            startTime: liveStartTime,
+            stopTime: liveStopTime,
+            duration: liveDuration_ms,
+          },
+          recorder: {
+            startTime: resp.startTime,
+            stopTime: resp.stopTime,
+            duration: resp.duration,
+          },
+          customOptions,
+        });
+        logger.info(`房间 ${roomId} 开始自动投稿结束`);
+      } else {
+        logger.info(`房间 ${roomId} 自动投稿已禁用, 投稿已取消`);
+      }
+
+      this.clearRecording(hash, roomManageOptions.autoUpload);
+
+      // Recorder 的生命结束
+      logger.debug(`录制器 ${hash} 的生命已结束，资源已清理 🧹`);
+    } finally {
+      // 清理处理标记
+      logger.debug(`${hash} -> 处理完成`);
+      this.processingHashes.delete(hash);
     }
-
-    logger.info(`房间 ${roomId} 开始停止录制, ${hash} 录制器 -> stopRecord()`);
-
-    if (!recorder.isRunning()) {
-      logger.debug(`WARN: ${hash} 的录制器未在录制`);
-    }
-
-    const resp = await recorder.stopRecordAndMerge();
-
-    const customOptions = liveConfigManager.get("rooms")[roomId]?.uploadOptions;
-
-    if (roomManageOptions.autoUpload) {
-      logger.info(`房间 ${roomId} 开始自动投稿`);
-      await this.upload({
-        hash,
-        file: resp.file,
-        roomInfo,
-        live: {
-          startTime: liveStartTime,
-          stopTime: liveStopTime,
-          duration: liveDuration_ms,
-        },
-        recorder: {
-          startTime: resp.startTime,
-          stopTime: resp.stopTime,
-          duration: resp.duration,
-        },
-        customOptions,
-      });
-      logger.info(`房间 ${roomId} 开始自动投稿结束`);
-    } else {
-      logger.info(`房间 ${roomId} 自动投稿已禁用, 投稿已取消`);
-    }
-
-    this.clearRecording(hash, roomManageOptions.autoUpload);
-
-    // Recorder 的生命结束
-    logger.debug(`录制器 ${hash} 的生命已结束，资源已清理 🧹`);
   }
 
   private async upload(options: UploadOptions) {
@@ -545,12 +574,24 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     hash: string,
     allowRestart = true
   ) {
+    logger.debug(`${hash} -> 任务开始强制结束`);
+
+    let resolveLock: (() => void) | undefined;
+    const lockPromise = new Promise<void>((resolve) => {
+      resolveLock = resolve;
+    });
+    this.hashLocks.set(hash, lockPromise);
+
+    logger.debug(`${hash} -> foreceStop -> HashLock 上锁🔒`);
+
     if (allowRestart) {
       this.waitingForRestartRecordTask.add(hash);
       logger.info(`任务 ${hash} 已放入等待区`);
     }
 
     try {
+      this.processingHashes.add(hash);
+
       let shouldUpload = false;
 
       const roomId = this.hashToRoomIdMap.get(hash);
@@ -622,6 +663,11 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
         logger.info(`强制停止任务失败，任务 ${hash} 已移出等待区`);
       }
       throw e;
+    } finally {
+      logger.debug(`${hash} -> forceStop -> finally -> HashLock 解锁🔓`);
+      this.processingHashes.delete(hash);
+      if (resolveLock) resolveLock();
+      this.hashLocks.delete(hash);
     }
   }
 
