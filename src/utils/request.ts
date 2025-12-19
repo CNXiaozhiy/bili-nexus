@@ -118,6 +118,7 @@ async function retryRequest<T>(
   } catch (error) {
     if (error instanceof GetConfigError) {
       logger.error(`获取请求配置失败 ❌`, error);
+      throw error;
     }
 
     const axiosError = error as AxiosError;
