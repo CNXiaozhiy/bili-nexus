@@ -1,4 +1,8 @@
-import XzQbot, { ReplyFunction } from "@/core/bot/xz-qbot";
+import XzQBot, {
+  ReplyFunction,
+  XzQBotError,
+  XzQBotSendError,
+} from "@/core/bot/xz-qbot";
 import {
   GroupMessageEvent,
   MessageEvent,
@@ -42,12 +46,12 @@ class AuthError extends Error {}
 type ProcessorContext<T, F = ReplyFunction<any>> = {
   event: T;
   reply: F;
-  bot: XzQbot;
+  bot: XzQBot;
 };
 
 export default class QQBotService {
   private htmlTemplatesRender = new HtmlTemplatesRender("./templates");
-  private bot: XzQbot | null = null;
+  private bot: XzQBot | null = null;
   private commandProcessor = new CommandProcessor<
     ProcessorContext<MessageEvent>,
     Messages | null
@@ -74,7 +78,7 @@ export default class QQBotService {
       );
     }
 
-    this.bot = new XzQbot(websocketClient.url);
+    this.bot = new XzQBot(websocketClient.url);
 
     await this.bot.connect();
 
@@ -149,8 +153,12 @@ export default class QQBotService {
       this.bot?.sendPrivate(superAdmin, [OneBotMessageUtils.Text(msg)]);
     });
 
-    notifyEmitter.on("msg-error", (message) => {
+    notifyEmitter.on("msg-error", (message, error) => {
       logger.info(`收到 notifyEmitter 致命错误⚠️，将通知 superAdmin`);
+      if (error instanceof XzQBotError) {
+        logger.error("🆘 错误为XzQBot错误，无法通过 QBot 通知，请尽快处理!");
+        return;
+      }
       const superAdmin = qqBotConfigManager.get("superAdmin");
       if (!superAdmin) {
         logger.error("未配置 superAdmin, 通知失败, 请尽快处理!");

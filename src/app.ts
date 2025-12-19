@@ -239,20 +239,24 @@ import { BiliAccount } from "./core/bilibili/bili-account";
 
 if (true) {
   process.on("uncaughtException", (error) => {
+    logger.error("uncaughtException", error);
+
     const errorMessage = FormatUtils.formatErrorMessage(
       "uncaughtException",
       error
     );
-    notifyEmitter.emit("msg-error", errorMessage);
+    notifyEmitter.emit("msg-error", errorMessage, error);
   });
 
   process.on("unhandledRejection", (reason, promise) => {
+    logger.error("unhandledRejection", reason);
+
     const errorMessage = FormatUtils.formatErrorMessage(
       "unhandledRejection",
       reason,
       promise
     );
-    notifyEmitter.emit("msg-error", errorMessage);
+    notifyEmitter.emit("msg-error", errorMessage, reason);
   });
 }
 

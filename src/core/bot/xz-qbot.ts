@@ -5,7 +5,7 @@ import * as OneBot from "@/types/one-bot";
 import getLogger from "@/utils/logger";
 import WebsocketUtils from "@/utils/websocket";
 
-const logger = getLogger("XzQbot");
+const logger = getLogger("XzQBot");
 
 export type ReplyFunction<T> = (
   message: OneBot.Messages,
@@ -17,7 +17,25 @@ export type ReplyFunction<T> = (
 
 const NETWORK_LATENCY_TOLERANCE = 5 * 1000; // 网络延迟容忍度 5s
 
-export interface XzQbotEvents {
+export class XzQBotError extends Error {}
+
+export class XzQBbotWebsocketError extends XzQBotError {
+  error: Error;
+  constructor(error: Error) {
+    super("XzQBotWebsocket Error");
+    this.error = error;
+  }
+}
+
+export class XzQBotSendError extends XzQBotError {
+  data: any;
+  constructor(message: string, data?: any) {
+    super(message);
+    this.data = data;
+  }
+}
+
+export interface XzQBotEvents {
   event: [data: { e: OneBot.Events }];
   message: [
     e: OneBot.MessageEvent,
@@ -40,7 +58,7 @@ export interface XzQbotEvents {
   ];
 }
 
-export class AbsXzQbot extends EventEmitter<XzQbotEvents> {
+export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
   protected wsUrl: string;
   protected ws: WebSocket;
   protected connectionPromise: Promise<void> | null = null;
@@ -71,7 +89,7 @@ export class AbsXzQbot extends EventEmitter<XzQbotEvents> {
           resolve();
         } else {
           this.ws.on("open", resolve);
-          this.ws.on("error", reject);
+          this.ws.on("error", (e) => reject(new XzQBbotWebsocketError(e)));
         }
       });
     }
@@ -82,7 +100,7 @@ export class AbsXzQbot extends EventEmitter<XzQbotEvents> {
     ws.on("close", (code) => {
       this._clearHeartbeatTimeout();
       logger.warn(
-        "[XzQbot Websocket]",
+        "[XzQBot Websocket]",
         "连接断开，将在 30s 后尝试重新连接, Code:",
         code
       );
@@ -91,7 +109,7 @@ export class AbsXzQbot extends EventEmitter<XzQbotEvents> {
     ws.on("error", (err) => {
       this._clearHeartbeatTimeout();
       logger.error(
-        "[XzQbot Websocket]",
+        "[XzQBot Websocket]",
         "连接发生错误，将在 30s 后尝试重新连接",
         err
       );
@@ -102,12 +120,12 @@ export class AbsXzQbot extends EventEmitter<XzQbotEvents> {
       // logger.debug(JSON.stringify(e));
 
       if (!e.post_type) {
-        // logger.warn("[XzQbot Websocket]", "未定义的消息", e);
+        // logger.warn("[XzQBot Websocket]", "未定义的消息", e);
         return;
       }
-      if (e.post_type === "relay-welcome") this._xzQBotGroupRelayHandler(e);
+      if (e.post_type === "relay-welcome") this._XzQBotGroupRelayHandler(e);
       else if (e.post_type === "relay-warning")
-        this._xzQBotGroupRelayHandler(e);
+        this._XzQBotGroupRelayHandler(e);
       else if (e.post_type === "message") this._messageHandler(e);
       else if (e.post_type === "message_sent") this._messageHandler(e);
       else if (e.post_type === "notice") this._notifyHandler(e);
@@ -127,7 +145,7 @@ export class AbsXzQbot extends EventEmitter<XzQbotEvents> {
     this._setNextHeartbeatTimeout(60 * 1000 + NETWORK_LATENCY_TOLERANCE);
   }
 
-  private _xzQBotGroupRelayHandler(e: OneBot.RelayEvent) {
+  private _XzQBotGroupRelayHandler(e: OneBot.RelayEvent) {
     logger.info("[XzQBot Group Relay]", e.message);
   }
 
@@ -233,7 +251,7 @@ export class AbsXzQbot extends EventEmitter<XzQbotEvents> {
    * 机器人心跳超时
    */
   private _heartbeatTimeout() {
-    logger.warn("[XzQbot Websocket]", "心跳超时, 尝试重连...");
+    logger.warn("[XzQBot Websocket]", "心跳超时, 尝试重连...");
     this.ws.close();
   }
 
@@ -244,7 +262,8 @@ export class AbsXzQbot extends EventEmitter<XzQbotEvents> {
   private _send<A extends OneBot.Actions>(
     params: OneBot.ActionPayload<A>
   ): Promise<OneBot.ActionOkResponse<A>> {
-    if (!this.connect()) return Promise.reject("Websocket not connected");
+    if (!this.connect())
+      return Promise.reject(new XzQBotSendError("Websocket is not connected"));
 
     const echo = uuid();
     this.__send({ ...params, echo });
@@ -256,7 +275,7 @@ export class AbsXzQbot extends EventEmitter<XzQbotEvents> {
 
         uninstall();
         if (data.status !== "ok") {
-          reject(data.message);
+          reject(new XzQBotSendError(data.message, data));
           return;
         }
         resolve(data);
@@ -276,7 +295,7 @@ export class AbsXzQbot extends EventEmitter<XzQbotEvents> {
   }
 }
 
-export default class XzQBot extends AbsXzQbot {
+export default class XzQBot extends AbsXzQBot {
   getLoginInfo() {
     return this._action({ action: "get_login_info", params: null });
   }
