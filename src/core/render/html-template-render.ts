@@ -65,30 +65,36 @@ export default class HtmlTemplateRender {
     const page = await bowser.newPage();
     await page.goto(`https://t.bilibili.com/${dynamicId}`, {});
 
-    await page.waitForSelector("#bili-header-container");
-    await page.waitForSelector("#app > div.content > div.card");
+    try {
+      await page.waitForSelector("#bili-header-container");
+      await page.waitForSelector("#app > div.content > div.card");
 
-    const card = await page.$("#app > div.content > div.card");
+      const card = await page.$("#app > div.content > div.card");
 
-    if (!card) throw new HtmlTemplateRenderError("未找到动态卡片");
+      if (!card) throw new HtmlTemplateRenderError("未找到动态卡片");
 
-    await page.evaluate(() => {
-      // @ts-ignore
-      document.querySelector("#bili-header-container").remove();
-      // @ts-ignore
-      document
-        .querySelector("#app > div.content > div.card > div.bili-tabs.dyn-tabs")
-        .remove();
-      // @ts-ignore
-      document.querySelector("#app > div.content > div.card").style[
-        "padding-bottom"
-      ] = "20px";
-      // @ts-ignore
-      document.querySelector("#app > div.content > div.card").style[
-        "border-radius"
-      ] = "0px";
-    });
+      await page.evaluate(() => {
+        // @ts-ignore
+        document.querySelector("#bili-header-container").remove();
+        // @ts-ignore
+        document
+          .querySelector(
+            "#app > div.content > div.card > div.bili-tabs.dyn-tabs"
+          )
+          .remove();
+        // @ts-ignore
+        document.querySelector("#app > div.content > div.card").style[
+          "padding-bottom"
+        ] = "20px";
+        // @ts-ignore
+        document.querySelector("#app > div.content > div.card").style[
+          "border-radius"
+        ] = "0px";
+      });
 
-    return await card.screenshot({ encoding: "base64" });
+      return await card.screenshot({ encoding: "base64" });
+    } finally {
+      page.close();
+    }
   }
 }
