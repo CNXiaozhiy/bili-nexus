@@ -755,6 +755,21 @@ export interface VideoInfo {
   argue_info: any;
 }
 
+export interface DanmuInfo {
+  group: "live";
+  business_id: number;
+  refresh_row_factor: number;
+  refresh_rate: number;
+  max_delay: number;
+  token: string;
+  host_list: {
+    host: string;
+    port: number;
+    wss_port: number;
+    ws_port: number;
+  }[];
+}
+
 export type DynamicType =
   | "DYNAMIC_TYPE_NONE"
   | "DYNAMIC_TYPE_FORWARD"

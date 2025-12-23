@@ -10,6 +10,7 @@ import {
   UserCard,
   UserInfo,
   VideoInfo,
+  DanmuInfo,
 } from "@/types/bilibili";
 import { Response } from "@/types/bilibili/bili-http-api";
 import { BiliHttpApiError } from "@/types/errors/bili-api";
@@ -245,6 +246,44 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       .map((item) => item?.url)
       .filter((url) => url !== undefined);
     return urls;
+  }
+
+  async getDMConfigByGroup(roomId: string | number) {
+    const resp = await request.get<Response<any>>(
+      `https://api.live.bilibili.com/xlive/web-room/v1/dM/GetDMConfigByGroup?${encWbi(
+        {
+          room_id: roomId,
+        },
+        await this.getAccountInfo()
+      )}`,
+      {
+        headers: {
+          cookie: this.getCookie(),
+        },
+      }
+    );
+
+    checkResponseCode(resp.data);
+
+    return resp.data.data;
+  }
+
+  async getDanmuInfo(roomId: string | number) {
+    const resp = await request.get<Response<DanmuInfo>>(
+      `https://api.live.bilibili.com/xlive/web-room/v1/index/getDanmuInfo?${encWbi(
+        { id: roomId },
+        await this.getAccountInfo()
+      )}`,
+      {
+        headers: {
+          cookie: this.getCookie(),
+        },
+      }
+    );
+
+    checkResponseCode(resp.data);
+
+    return resp.data.data;
   }
 
   // room_id 似乎没用
