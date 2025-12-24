@@ -270,9 +270,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
         this.checkSegmentFiles();
 
         resolve({
-          segmentFiles: Array.from(this.segmentFiles).map(
-            ([filePath]) => filePath
-          ),
+          segmentFiles: this.getSegmentFiles(),
           startTime: this.startTime,
           stopTime: this.stopTime,
           duration: this.duration,
@@ -410,6 +408,10 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     this._checkIfDestroyed();
 
     return this.segmentFiles.size;
+  }
+
+  public getSegmentFiles() {
+    return Array.from(this.segmentFiles).map(([filePath]) => filePath);
   }
 
   public generateNewFilePath(index: number | string) {

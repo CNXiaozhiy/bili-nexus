@@ -444,38 +444,77 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
         logger.debug(`WARN: ${hash} 的录制器未在录制`);
       }
 
-      const resp = await recorder.stopRecordAndMerge();
-
       const customOptions =
         liveConfigManager.get("rooms")[roomId]?.uploadOptions;
 
-      if (roomManageOptions.autoUpload) {
-        logger.info(`房间 ${roomId} 开始自动投稿`);
-        await this.upload({
-          hash,
-          file: resp.file,
-          roomInfo,
-          live: {
-            startTime: liveStartTime,
-            stopTime: liveStopTime,
-            duration: liveDuration_ms,
-          },
-          recorder: {
-            startTime: resp.startTime,
-            stopTime: resp.stopTime,
-            duration: resp.duration,
-          },
-          customOptions,
-        });
-        logger.info(`房间 ${roomId} 开始自动投稿结束`);
-      } else {
-        logger.info(`房间 ${roomId} 自动投稿已禁用, 投稿已取消`);
+      try {
+        const resp = await recorder.stopRecordAndMerge();
+
+        if (roomManageOptions.autoUpload) {
+          logger.info(`房间 ${roomId} 开始自动投稿`);
+          await this.upload({
+            hash,
+            file: resp.file,
+            roomInfo,
+            live: {
+              startTime: liveStartTime,
+              stopTime: liveStopTime,
+              duration: liveDuration_ms,
+            },
+            recorder: {
+              startTime: resp.startTime,
+              stopTime: resp.stopTime,
+              duration: resp.duration,
+            },
+            customOptions,
+          });
+          logger.info(`房间 ${roomId} 自动投稿结束`);
+        } else {
+          logger.info(`房间 ${roomId} 自动投稿已禁用, 投稿已取消`);
+        }
+
+        this.clearRecording(hash, roomManageOptions.autoUpload);
+
+        // Recorder 的生命结束
+        logger.debug(`录制器 ${hash} 的生命已结束，资源已清理 🧹`);
+      } catch (e) {
+        logger.error("停止录制或投稿失败 ❌", e);
+
+        notifyEmitter.emit(
+          "msg-warn",
+          `停止录制或投稿失败 ❌\n\n` +
+            "错误：\n" +
+            FormatUtils.formatErrorMessage("UploadVideoError", e as Error) +
+            `\n\n` +
+            `您可以尝试重新投稿\n` +
+            `文件：${recorder.getSegmentFiles().join(", ")}\n` +
+            `部分投稿配置：\n` +
+            JSON.stringify({
+              hash,
+              roomInfo,
+              live: {
+                startTime: liveStartTime,
+                stopTime: liveStopTime,
+                duration: liveDuration_ms,
+              },
+              recorder: {
+                startTime: recorder.getStats().startTime,
+                stopTime: recorder.getStats().stopTime,
+                duration: recorder.getStats().duration,
+              },
+              customOptions,
+            })
+        );
+
+        this.clearRecording(hash, false);
+
+        // Recorder 的生命结束
+        logger.debug(
+          `录制器 ${hash} 的生命已结束，由于投稿失败，资源暂未清理 ⌛️`
+        );
       }
 
-      this.clearRecording(hash, roomManageOptions.autoUpload);
-
-      // Recorder 的生命结束
-      logger.debug(`录制器 ${hash} 的生命已结束，资源已清理 🧹`);
+      logger.debug("handleLiveEnd -> 完成");
     } finally {
       // 清理处理标记
       logger.debug(`${hash} -> 处理完成`);
