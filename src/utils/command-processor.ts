@@ -53,6 +53,8 @@ export default class CommandProcessor<E = null, R = void> {
    */
   async execute(input: string, e: E): Promise<ExecuteResult<R>> {
     try {
+      if (!input.trim()) return { success: false, result: null };
+
       const { command, args } = this.parseInput(input);
 
       if (!command) {
