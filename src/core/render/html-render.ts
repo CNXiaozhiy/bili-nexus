@@ -104,6 +104,17 @@ export default class HtmlRender {
       logger.warn("收到 SIGTERM 信号，正在关闭浏览器...");
       await this.browser?.close();
     });
+
+    setInterval(async () => {
+      if (!this.taskQueue.isBusy()) {
+        logger.info("开始重启 htmlRender");
+        this.browser?.close();
+        this.browser = await puppeteer.launch(launchOption);
+        logger.info("重启完成 ✅");
+      } else {
+        logger.warn("当前有任务正在处理，跳过重启 htmlRender");
+      }
+    }, 60 * 60 * 1000);
   }
 
   private async waitForAllResources(page: any, timeout = 30000) {
