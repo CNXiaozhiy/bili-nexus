@@ -104,9 +104,11 @@ export class App {
 
     logger.debug("HtmlRender 初始化完成");
 
-    // 初始化 BiliApiService
+    // 初始化 BiliAccountService
     const defaultAccount = accountConfigManager.get("defaultUid");
     const accounts = accountConfigManager.get("accounts");
+
+    logger.info("检测到", Object.keys(accounts).length, "个账号");
 
     let defaultBiliAccount: BiliAccount;
 
@@ -164,7 +166,9 @@ export class App {
       );
     }
 
-    logger.debug("BiliApiService 初始化完成");
+    BiliAccountService.init();
+
+    logger.debug("BiliAccountService 初始化完成");
 
     // 初始化 LiveAutomationManager
     const rooms = liveConfigManager.get("rooms");

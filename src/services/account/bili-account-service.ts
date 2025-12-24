@@ -15,12 +15,15 @@ export default class BiliAccountService {
 
   private static accountCheckInterval: NodeJS.Timeout;
 
-  constructor() {
+  public static init() {
     BiliAccountService.accountCheckInterval = setInterval(
       BiliAccountService.checkAccounts,
       60 * 60 * 1000
     );
     logger.info(`周期性账号健康检查定时器已设置成功 ✅`);
+
+    logger.info("首次账号健康检查开始 ⌛️");
+    BiliAccountService.checkAccounts();
   }
 
   public static register(account: UserAccount) {
