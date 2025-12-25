@@ -41,7 +41,6 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
   private segmentFiles = new Map<string, SegMentFileMate>();
 
   // Stats
-  private duration: number = 0; // 录制总时长
   private retryCount: number = 0;
   private startTime: number = 0;
   private stopTime: number = 0;
@@ -221,7 +220,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
 
     this.recFfmpeg.once("done", async (outputPath, stats) => {
       logger.info(`${this.hash} -> ffmpeg 录制结束`);
-      this.emit("end", this.duration);
+      this.emit("end", this.getDuration());
     });
 
     this.recFfmpeg.start();
@@ -238,7 +237,6 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     logger.info(`${this.hash} -> stopRecord()`);
     logger.debug(`${this.hash} -> 将设置(覆盖) stopTime, segmentMate`);
     this.stopTime = Date.now();
-    this._setCurrentSegmentFileMateEndTime();
 
     return await new Promise<{
       segmentFiles: string[];
@@ -249,34 +247,12 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
       const _stop = () => {
         logger.debug(`录制 _stop -> 结束`);
 
-        const { segmentFinished } = this._getCuttentSegmentFileMate();
-
-        // 更新录制时长
-        if (!segmentFinished) {
-          if (this.ffmpegStats && this.ffmpegStats.time) {
-            logger.debug(
-              "oldDuration:",
-              this.duration,
-              "currentSegmentDuration:",
-              this.ffmpegStats.time
-            );
-
-            this.duration += TimeUtils.parseTimeToMsRegex(
-              this.ffmpegStats.time
-            );
-          } else {
-            logger.warn(
-              "获取上个分段录制时长失败, 将使用函数调用时间差作为时长, stats:",
-              this.ffmpegStats
-            );
-            this.duration += this.stopTime - this.startTime;
-          }
-        } else {
-          logger.debug("分段已结束，更新录制时长失败");
-        }
+        this._setCurrentSegmentFileMateEndTime();
 
         logger.info(
-          `录制时长: ${FormatUtils.formatDurationWithoutSeconds(this.duration)}`
+          `录制时长: ${FormatUtils.formatDurationWithoutSeconds(
+            this.getDuration()
+          )}`
         );
 
         this.recFfmpeg = null;
@@ -291,7 +267,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
           segmentFiles: this.getSegmentFiles(),
           startTime: this.startTime,
           stopTime: this.stopTime,
-          duration: this.duration,
+          duration: this.getDuration(),
         });
       };
 
@@ -414,7 +390,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
 
     return {
       hash: this.hash,
-      duration: this.duration,
+      duration: this.getDuration(),
       retryCount: this.retryCount,
       startTime: this.startTime,
       stopTime: this.stopTime,
@@ -429,6 +405,8 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
   }
 
   public getSegmentFiles() {
+    this._checkIfDestroyed();
+
     return Array.from(this.segmentFiles).map(([filePath]) => filePath);
   }
 
@@ -496,12 +474,19 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     }
 
     this.segmentFiles.clear();
-    this.duration = 0;
     this.retryCount = 0;
     this.startTime = 0;
     this.stopTime = 0;
 
     logger.info("录制器重置完成 ✅");
+  }
+
+  public getDuration() {
+    this._checkIfDestroyed();
+
+    return Array.from(this.segmentFiles)
+      .map(([, mate]) => mate.end - mate.start)
+      .reduce((acc, cur) => acc + cur, 0);
   }
 
   public destroy(deleteFile = false) {
