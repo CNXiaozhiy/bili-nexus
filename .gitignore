@@ -17,6 +17,7 @@ dist-ssr
 recordings
 vendor
 /config
+/src/test
 
 # Editor directories and files
 .vscode/*
