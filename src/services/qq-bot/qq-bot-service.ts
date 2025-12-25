@@ -170,24 +170,24 @@ export default class QQBotService {
   }
 
   private registerCommands() {
-    this.commandProcessor.setDefaultHandler(async (args, e, command) => {
-      logger.info("commandProcessor.DefaultHandler", { args, e, command });
-      return null;
-    });
+    // this.commandProcessor.setDefaultHandler(async (args, e, command) => {
+    //   logger.info("commandProcessor.DefaultHandler", { args, e, command });
+    //   return null;
+    // });
 
-    this.privateCommandProcessor.setDefaultHandler(async (args, e, command) => {
-      logger.info("privateCommandProcessor.DefaultHandler", {
-        args,
-        e,
-        command,
-      });
-      return null;
-    });
+    // this.privateCommandProcessor.setDefaultHandler(async (args, e, command) => {
+    //   logger.info("privateCommandProcessor.DefaultHandler", {
+    //     args,
+    //     e,
+    //     command,
+    //   });
+    //   return null;
+    // });
 
-    this.groupCommandProcessor.setDefaultHandler(async (args, e, command) => {
-      logger.info("groupCommandProcessor.DefaultHandler", { args, e, command });
-      return null;
-    });
+    // this.groupCommandProcessor.setDefaultHandler(async (args, e, command) => {
+    //   logger.info("groupCommandProcessor.DefaultHandler", { args, e, command });
+    //   return null;
+    // });
 
     const subscribeLiveRoom = (
       qid: number,
