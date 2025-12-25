@@ -485,6 +485,82 @@ export default class QQBotService {
       return "正在结束所有录制任务";
     });
 
+    this.commandProcessor.register(".blh.drop.room", async (args, context) => {
+      if (!Utils.auth(context.event.user_id, 10))
+        throw new AuthError("权限不足");
+
+      if (args.length < 1 || !args.every((e) => parseInt(e) > 0)) {
+        return "参数错误";
+      }
+
+      const rooms = args;
+      const targetRooms = new Set(rooms);
+
+      for (const _roomId of targetRooms) {
+        const roomId = parseInt(_roomId);
+        const recorders =
+          this.liveAutomationManager.getRecordersMapByRoomId(roomId);
+
+        if (recorders.size > 0) {
+          for (const [hash, _] of recorders) {
+            this.liveAutomationManager.forceClearRecording(hash, true);
+            context.reply(`已销毁录制任务[${hash}]`);
+          }
+        } else {
+          context.reply("直播间无录制任务");
+        }
+      }
+
+      return null;
+    });
+
+    this.commandProcessor.register(
+      ".blh.drop.recording",
+      async (args, context) => {
+        if (!Utils.auth(context.event.user_id, 10))
+          throw new AuthError("权限不足");
+
+        if (args.length < 1 || !args.every((e) => e.length >= 7)) {
+          return "参数错误，hash 至少七位";
+        }
+
+        const targetHashes = new Set(args);
+        const liveRecorders = this.liveAutomationManager.getLiveRecorders();
+
+        const matchedHashes = Array.from(liveRecorders)
+          .filter(([hash]) =>
+            Array.from(targetHashes).some((targetHash) =>
+              hash.startsWith(targetHash)
+            )
+          )
+          .map(([hash, _]) => hash);
+
+        if (matchedHashes.length > 0) {
+          matchedHashes.forEach((hash) => {
+            const targetHash = Array.from(targetHashes).find((th) =>
+              hash.startsWith(th)
+            );
+
+            logger.info(
+              `已找到指定录制任务，即将销毁 ${hash}, by targetHash -> ${targetHash}`
+            );
+
+            this.liveAutomationManager.forceClearRecording(hash, true);
+            context.reply(`已销毁录制任务[${targetHash}]`);
+          });
+
+          logger.info(`共销毁 ${matchedHashes.length} 个录制任务`);
+        } else {
+          logger.warn("未找到匹配的录制器", {
+            targetHashes: Array.from(targetHashes),
+          });
+          context.reply("未找到匹配的录制器");
+        }
+
+        return null;
+      }
+    );
+
     this.groupCommandProcessor.register("一键订阅", async (args, context) => {
       const oneClickSubscribe = canOneClickSubscribe(context.event.group_id);
       if (!oneClickSubscribe.can) {

@@ -239,6 +239,10 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     return Promise.all(promises);
   }
 
+  public forceClearRecording(hash: string, deleteFile: boolean) {
+    this.clearRecording(hash, deleteFile);
+  }
+
   private installLiveMonitorEventListeners(
     liveMonitor: LiveMonitor,
     roomId: number,
