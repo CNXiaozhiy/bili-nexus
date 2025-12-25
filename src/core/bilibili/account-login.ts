@@ -5,7 +5,7 @@ import BiliHttpApi from "@/core/bilibili/bili-http-api";
 import { LoginInfo } from "@/types/bilibili";
 import { LoginAccountError } from "@/types/errors/login";
 import { accountConfigManager } from "@/common";
-import { getLogger } from "log4js";
+import getLogger from "@/utils/logger";
 
 const logger = getLogger("LoginAccount");
 

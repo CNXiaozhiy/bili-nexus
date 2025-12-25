@@ -1,6 +1,6 @@
 import EventEmitter from "events";
 import SpaceDynamicMonitor from "@/core/bilibili/dynamic/space-dynamic-monitor";
-import { getLogger } from "log4js";
+import getLogger from "@/utils/logger";
 import { BiliAccount } from "@/core/bilibili/bili-account";
 
 const logger = getLogger("DynamicAutomationManager");
