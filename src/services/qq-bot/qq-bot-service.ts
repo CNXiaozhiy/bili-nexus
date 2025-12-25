@@ -38,6 +38,7 @@ import FormatUtils from "@/utils/format";
 import BiliUtils from "@/utils/bili";
 
 import BiliAccountService from "../account/bili-account-service";
+import { getErrorImageBase64 } from "@/utils/render";
 
 const logger = getLogger("QQBotService");
 
@@ -444,13 +445,6 @@ export default class QQBotService {
         ),
       ];
     };
-
-    this.commandProcessor.register(".bn.help", async () => {
-      const base64 = await this.htmlTemplatesRender.render("help", {
-        message: "暂无",
-      });
-      return [OneBotMessageUtils.Base64Image(base64)];
-    });
 
     this.commandProcessor.register(".bn.room", async (args, context) => {
       if (!Utils.auth(context.event.user_id, 1))
@@ -1537,7 +1531,7 @@ export default class QQBotService {
 
         await this.bot.sendGroup(gid, [
           OneBotMessageUtils.Base64Image(
-            await this.htmlTemplatesRender.newDynamic(dynamicId)
+            await Utils.renderNewDynamic(this.htmlTemplatesRender, dynamicId)
           ),
         ]);
 
@@ -1653,27 +1647,42 @@ class Utils {
     roomInfo: LiveRoomInfo,
     liveHash: string
   ) {
-    return await htmlTemplatesRender.render("live_status_landscape", {
-      status: roomInfo.live_status,
-      background_image: roomInfo.background,
-      cover_image: roomInfo.user_cover,
-      parent_area_name: roomInfo.parent_area_name,
-      area_name: roomInfo.area_name,
-      live_time:
-        roomInfo.live_status === LiveRoomStatus.LIVE
-          ? roomInfo.live_time
-          : "未开播",
-      title: roomInfo.title,
-      description: roomInfo.description,
-      popularity: roomInfo.online.toString(),
-      duration:
-        roomInfo.live_status === LiveRoomStatus.LIVE
-          ? FormatUtils.formatDurationDetailed(
-              Date.now() - new Date(roomInfo.live_time).getTime()
-            )
-          : "未开播",
-      liveHash: liveHash,
-    });
+    try {
+      return await htmlTemplatesRender.render("live_status_landscape", {
+        status: roomInfo.live_status,
+        background_image: roomInfo.background,
+        cover_image: roomInfo.user_cover,
+        parent_area_name: roomInfo.parent_area_name,
+        area_name: roomInfo.area_name,
+        live_time:
+          roomInfo.live_status === LiveRoomStatus.LIVE
+            ? roomInfo.live_time
+            : "未开播",
+        title: roomInfo.title,
+        description: roomInfo.description,
+        popularity: roomInfo.online.toString(),
+        duration:
+          roomInfo.live_status === LiveRoomStatus.LIVE
+            ? FormatUtils.formatDurationDetailed(
+                Date.now() - new Date(roomInfo.live_time).getTime()
+              )
+            : "未开播",
+        liveHash: liveHash,
+      });
+    } catch (e) {
+      return getErrorImageBase64();
+    }
+  }
+
+  static async renderNewDynamic(
+    htmlTemplatesRender: HtmlTemplatesRender,
+    dynamicId: string | number
+  ) {
+    try {
+      return await htmlTemplatesRender.newDynamic(dynamicId);
+    } catch (e) {
+      return getErrorImageBase64();
+    }
   }
 
   static auth(qid: number, permission = 1) {
