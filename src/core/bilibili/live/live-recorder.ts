@@ -125,19 +125,34 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     });
   }
 
-  private _setCurrentSegmentFileMateEndTime() {
+  private _getCuttentSegmentFileMate() {
     const segmentFiles = Array.from(this.segmentFiles);
     const segmentFile = segmentFiles[segmentFiles.length - 1];
     const segmentFileFilePath = segmentFile[0];
     const segmentFileMate = segmentFile[1];
 
-    segmentFile[1].end = Date.now();
-    logger.debug(
-      "已设置分段的结束时间 ->",
+    return {
       segmentFileFilePath,
-      "mate ->",
-      segmentFileMate
-    );
+      segmentFileMate,
+      segmentFinished: !!segmentFileMate.end,
+    };
+  }
+
+  private _setCurrentSegmentFileMateEndTime() {
+    const { segmentFileFilePath, segmentFileMate, segmentFinished } =
+      this._getCuttentSegmentFileMate();
+
+    if (segmentFinished) {
+      logger.warn("分段已结束，设置结束失败");
+    } else {
+      segmentFileMate.end = Date.now();
+      logger.debug(
+        "已设置分段的结束时间 ->",
+        segmentFileFilePath,
+        "mate ->",
+        segmentFileMate
+      );
+    }
   }
 
   public startRecord() {
@@ -234,32 +249,35 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
       const _stop = () => {
         logger.debug(`录制 _stop -> 结束`);
 
-        if (this.ffmpegStats && this.ffmpegStats.time) {
-          logger.debug(
-            "oldDuration:",
-            this.duration,
-            "currentSegmentDuration:",
-            this.ffmpegStats.time
-          );
+        const { segmentFinished } = this._getCuttentSegmentFileMate();
 
-          this.duration += TimeUtils.parseTimeToMsRegex(this.ffmpegStats.time);
-          logger.info(
-            `录制时长: ${FormatUtils.formatDurationWithoutSeconds(
-              this.duration
-            )}`
-          );
+        // 更新录制时长
+        if (!segmentFinished) {
+          if (this.ffmpegStats && this.ffmpegStats.time) {
+            logger.debug(
+              "oldDuration:",
+              this.duration,
+              "currentSegmentDuration:",
+              this.ffmpegStats.time
+            );
+
+            this.duration += TimeUtils.parseTimeToMsRegex(
+              this.ffmpegStats.time
+            );
+          } else {
+            logger.warn(
+              "获取上个分段录制时长失败, 将使用函数调用时间差作为时长, stats:",
+              this.ffmpegStats
+            );
+            this.duration += this.stopTime - this.startTime;
+          }
         } else {
-          logger.warn(
-            "获取上个分段录制时长失败, 将使用函数调用时间差作为时长, stats:",
-            this.ffmpegStats
-          );
-          this.duration += this.stopTime - this.startTime;
-          logger.info(
-            `录制时长: ${FormatUtils.formatDurationWithoutSeconds(
-              this.duration
-            )}`
-          );
+          logger.debug("分段已结束，更新录制时长失败");
         }
+
+        logger.info(
+          `录制时长: ${FormatUtils.formatDurationWithoutSeconds(this.duration)}`
+        );
 
         this.recFfmpeg = null;
         this.ffmpegRunning = false;
