@@ -243,6 +243,13 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     this.clearRecording(hash, deleteFile);
   }
 
+  public forceStopRecording(hash: string, allowRestart = true) {
+    const recorder = this.liveRecorders.get(hash);
+    if (!recorder) return Promise.reject("无效 Hash，未找到对应的录制器");
+
+    return this.forceStopRecord(recorder, hash, allowRestart);
+  }
+
   private installLiveMonitorEventListeners(
     liveMonitor: LiveMonitor,
     roomId: number,

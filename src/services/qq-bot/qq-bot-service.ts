@@ -445,14 +445,14 @@ export default class QQBotService {
       ];
     };
 
-    this.commandProcessor.register(".blh.help", async () => {
+    this.commandProcessor.register(".bn.help", async () => {
       const base64 = await this.htmlTemplatesRender.render("help", {
         message: "暂无",
       });
       return [OneBotMessageUtils.Base64Image(base64)];
     });
 
-    this.commandProcessor.register(".blh.room", async (args, context) => {
+    this.commandProcessor.register(".bn.room", async (args, context) => {
       if (!Utils.auth(context.event.user_id, 1))
         throw new AuthError("权限不足");
       const liveRoomsConfig = qqBotConfigManager.get("liveRoom");
@@ -465,7 +465,7 @@ export default class QQBotService {
       return rooms.join(", ");
     });
 
-    this.commandProcessor.register(".blh.stop", async (args, context) => {
+    this.commandProcessor.register(".bn.stop", async (args, context) => {
       if (!Utils.auth(context.event.user_id, 20))
         throw new AuthError("权限不足");
 
@@ -485,9 +485,19 @@ export default class QQBotService {
       return "正在结束所有录制任务";
     });
 
-    this.commandProcessor.register(".blh.drop.room", async (args, context) => {
+    this.commandProcessor.register(".bn.drop.room", async (args, context) => {
       if (!Utils.auth(context.event.user_id, 10))
         throw new AuthError("权限不足");
+
+      let normal = false;
+
+      if (args[0] === "normal") {
+        normal = true;
+        args = args.slice(1);
+        logger.debug("销毁所有录制任务 -> 正常模式");
+      }
+
+      logger.info("销毁房间所有录制任务 ->", args);
 
       if (args.length < 1 || !args.every((e) => parseInt(e) > 0)) {
         return "参数错误";
@@ -503,8 +513,22 @@ export default class QQBotService {
 
         if (recorders.size > 0) {
           for (const [hash, _] of recorders) {
-            this.liveAutomationManager.forceClearRecording(hash, true);
-            context.reply(`已销毁录制任务[${hash}]`);
+            if (normal) {
+              context.reply(`开始提前完成录制任务[${hash}]`);
+              this.liveAutomationManager
+                .forceStopRecording(hash, true)
+                .then(() => context.reply(`录制任务已结束[${hash}]`))
+                .catch((e) => {
+                  context.reply(`销毁录制任务[${hash}]失败\n\n${e}`);
+                  notifyEmitter.emit(
+                    "msg-warn",
+                    FormatUtils.formatErrorMessage("DropRecording", e)
+                  );
+                });
+            } else {
+              this.liveAutomationManager.forceClearRecording(hash, true);
+              context.reply(`已销毁录制任务[${hash}]`);
+            }
           }
         } else {
           context.reply("直播间无录制任务");
@@ -515,10 +539,20 @@ export default class QQBotService {
     });
 
     this.commandProcessor.register(
-      ".blh.drop.recording",
+      ".bn.drop.recording",
       async (args, context) => {
         if (!Utils.auth(context.event.user_id, 10))
           throw new AuthError("权限不足");
+
+        let normal = false;
+
+        if (args[0] === "normal") {
+          normal = true;
+          args = args.slice(1);
+          logger.debug("销毁录制任务 -> 正常模式");
+        }
+
+        logger.info("销毁录制任务 ->", args);
 
         if (args.length < 1 || !args.every((e) => e.length >= 7)) {
           return "参数错误，hash 至少七位";
@@ -545,8 +579,22 @@ export default class QQBotService {
               `已找到指定录制任务，即将销毁 ${hash}, by targetHash -> ${targetHash}`
             );
 
-            this.liveAutomationManager.forceClearRecording(hash, true);
-            context.reply(`已销毁录制任务[${targetHash}]`);
+            if (normal) {
+              context.reply(`开始提前完成录制任务[${targetHash}]`);
+              this.liveAutomationManager
+                .forceStopRecording(hash, true)
+                .then(() => context.reply(`录制任务已结束[${targetHash}]`))
+                .catch((e) => {
+                  context.reply(`销毁录制任务[${targetHash}]失败\n\n${e}`);
+                  notifyEmitter.emit(
+                    "msg-warn",
+                    FormatUtils.formatErrorMessage("DropRecording", e)
+                  );
+                });
+            } else {
+              this.liveAutomationManager.forceClearRecording(hash, true);
+              context.reply(`已销毁录制任务[${targetHash}]`);
+            }
           });
 
           logger.info(`共销毁 ${matchedHashes.length} 个录制任务`);
