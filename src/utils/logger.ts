@@ -38,6 +38,6 @@ log4js.configure({
   },
 });
 
-const getLogger = log4js.getLogger;
+const getLogger = (category?: string) => log4js.getLogger(category);
 
 export default getLogger;
