@@ -13,11 +13,15 @@ _Automate, Monitor, Control — Your All-in-One Bilibili Live Solution._
 
 </div>
 
+## ⚠️ 重要提醒
+
+**受上游仓库 BAC 关闭的影响，本项目目前进入暂缓推进阶段。**
+
 ## ✨ 简介
 
 **BiliNexus** 是一个基于 TypeScript/Node.js 开发的 B 站直播全自动管理平台。采用模块化设计和容器化部署，提供一站式的直播录制、监控、管理和自动化投稿解决方案。
 
-## ⚠️ 部署建议
+## 📋 部署建议
 
 **本项目为服务器级应用，建议在具备以下条件的长期运行服务器上部署：**
 
