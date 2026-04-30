@@ -71,7 +71,7 @@ export default class HtmlRender {
     logger.debug(
       "资源服务器启动 -> ",
       this.server.address(),
-      `, resourcePath: ${resourcePath}`
+      `, resourcePath: ${resourcePath}`,
     );
   }
 
@@ -84,7 +84,7 @@ export default class HtmlRender {
     if (address == null) throw new HtmlRenderError("资源服务器未启动");
     if (typeof address === "string")
       throw new HtmlRenderError(
-        "server listening on a pipe or Unix domain socket"
+        "server listening on a pipe or Unix domain socket",
       );
     return `http://localhost:${address.port}/resource/${resource}`;
   }
@@ -105,16 +105,16 @@ export default class HtmlRender {
       await this.browser?.close();
     });
 
-    setInterval(async () => {
-      if (!this.taskQueue.isBusy()) {
-        logger.info("开始重启 htmlRender");
-        this.browser?.close();
-        this.browser = await puppeteer.launch(launchOption);
-        logger.info("重启完成 ✅");
-      } else {
-        logger.warn("当前有任务正在处理，跳过重启 htmlRender");
-      }
-    }, 60 * 60 * 1000);
+    // setInterval(async () => {
+    //   if (!this.taskQueue.isBusy()) {
+    //     logger.info("开始重启 htmlRender");
+    //     this.browser?.close();
+    //     this.browser = await puppeteer.launch(launchOption);
+    //     logger.info("重启完成 ✅");
+    //   } else {
+    //     logger.warn("当前有任务正在处理，跳过重启 htmlRender");
+    //   }
+    // }, 60 * 60 * 1000);
   }
 
   private async waitForAllResources(page: any, timeout = 30000) {
@@ -128,7 +128,7 @@ export default class HtmlRender {
               img.addEventListener("load", resolve);
               img.addEventListener("error", reject);
             });
-          })
+          }),
         );
       })
       .catch((e: Error) => {
@@ -138,16 +138,16 @@ export default class HtmlRender {
 
   public async renderHtmlCodeToImage(
     html: string,
-    screenshotPath: ScreenshotOptions["path"]
+    screenshotPath: ScreenshotOptions["path"],
   ): Promise<string> {
     return this.taskQueue.enqueue(() =>
-      this._renderHtmlCodeToImage(html, screenshotPath)
+      this._renderHtmlCodeToImage(html, screenshotPath),
     );
   }
 
   private async _renderHtmlCodeToImage(
     html: string,
-    screenshotPath: ScreenshotOptions["path"]
+    screenshotPath: ScreenshotOptions["path"],
   ): Promise<string> {
     if (!this.browser) throw new HtmlRenderError("浏览器未初始化");
 
@@ -198,16 +198,16 @@ export default class HtmlRender {
 
   public async renderToImage(
     url: string,
-    screenshotPath: ScreenshotOptions["path"]
+    screenshotPath: ScreenshotOptions["path"],
   ): Promise<string> {
     return this.taskQueue.enqueue(() =>
-      this._renderToImage(url, screenshotPath)
+      this._renderToImage(url, screenshotPath),
     );
   }
 
   private async _renderToImage(
     url: string,
-    screenshotPath: ScreenshotOptions["path"]
+    screenshotPath: ScreenshotOptions["path"],
   ): Promise<string> {
     if (!this.browser) throw new HtmlRenderError("浏览器未初始化");
 
@@ -220,10 +220,10 @@ export default class HtmlRender {
       await this.waitForAllResources(page);
 
       const width = (await page.evaluate(
-        "document.body.scrollWidth"
+        "document.body.scrollWidth",
       )) as number;
       const height = (await page.evaluate(
-        "document.body.scrollHeight"
+        "document.body.scrollHeight",
       )) as number;
       await page.setViewport({ width, height });
       const path = await page.screenshot({
@@ -253,10 +253,10 @@ export default class HtmlRender {
       await this.waitForAllResources(page);
 
       const width = (await page.evaluate(
-        "document.body.scrollWidth"
+        "document.body.scrollWidth",
       )) as number;
       const height = (await page.evaluate(
-        "document.body.scrollHeight"
+        "document.body.scrollHeight",
       )) as number;
       await page.setViewport({ width, height });
       const base64 = await page.screenshot({
