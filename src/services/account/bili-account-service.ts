@@ -80,6 +80,8 @@ export default class BiliAccountService {
           accountConfigManager.set("accounts", accountsConfig);
           const accountInfo = biliApi.getAccountInfo();
           logger.info(`账号 ${(await accountInfo).uname}(${uid}) 刷新成功✅`);
+        } else {
+            logger.debug(`账号 ${uid} Cookie 未过期✅`);
         }
       } catch (e) {
         logger.error(`账号 ${uid} 刷新失败❌，请重新登陆, Err:`, e);
