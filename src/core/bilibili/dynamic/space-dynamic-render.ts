@@ -33,7 +33,7 @@ export default class SpaceDynamicRender {
 
   static async health(renderConfig: SpaceDynamicRenderConfig): Promise<boolean> {
     try {
-      const resp = await request.get<{
+      const resp = await request.instance.get<{
         code: number;
         message: string;
       }>(`http://${renderConfig.host}:${renderConfig.port}/health`);
