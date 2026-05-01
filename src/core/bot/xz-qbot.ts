@@ -12,7 +12,7 @@ export type ReplyFunction<T> = (
   options?: {
     at?: boolean;
     reference?: boolean;
-  },
+  }
 ) => Promise<T>;
 
 const NETWORK_LATENCY_TOLERANCE = 5 * 1000; // 网络延迟容忍度 5s
@@ -37,25 +37,13 @@ export class XzQBotSendError extends XzQBotError {
 
 export interface XzQBotEvents {
   event: [data: { e: OneBot.Events }];
-  message: [
-    e: OneBot.MessageEvent,
-    reply: ReplyFunction<
-      | OneBot.ActionOkResponse<"send_group_msg">
-      | OneBot.ActionOkResponse<"send_private_msg">
-    >,
-  ];
-  group_message: [
-    e: OneBot.GroupMessageEvent | OneBot.GroupMessageSentEvent,
-    reply: ReplyFunction<OneBot.ActionOkResponse<"send_group_msg">>,
-  ];
+  message: [e: OneBot.MessageEvent, reply: ReplyFunction<OneBot.ActionOkResponse<"send_group_msg"> | OneBot.ActionOkResponse<"send_private_msg">>];
+  group_message: [e: OneBot.GroupMessageEvent | OneBot.GroupMessageSentEvent, reply: ReplyFunction<OneBot.ActionOkResponse<"send_group_msg">>];
   private_message: [
     e: OneBot.PrivateMessageEvent | OneBot.PrivateMessageSentEvent,
-    reply: ReplyFunction<OneBot.ActionOkResponse<"send_private_msg">>,
+    reply: ReplyFunction<OneBot.ActionOkResponse<"send_private_msg">>
   ];
-  group_recall: [
-    e: OneBot.GroupMessageRecallNoticeEvent,
-    message_id: OneBot.MessageID,
-  ];
+  group_recall: [e: OneBot.GroupMessageRecallNoticeEvent, message_id: OneBot.MessageID];
 }
 
 export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
@@ -67,9 +55,10 @@ export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
 
   protected selfId: number = 0;
 
-  constructor(wsUrl: string) {
+  constructor(wsUrl: string, qq: number) {
     super();
     this.wsUrl = wsUrl;
+    this.selfId = qq || 0;
     this.ws = new WebSocket(wsUrl);
     this.ws.setMaxListeners(Infinity);
     this.installListener(this.ws);
@@ -99,20 +88,12 @@ export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
   private installListener(ws: WebSocket) {
     ws.on("close", (code) => {
       this._clearHeartbeatTimeout();
-      logger.warn(
-        "[XzQBot Websocket]",
-        "连接断开，将在 30s 后尝试重新连接, Code:",
-        code,
-      );
+      logger.warn("[XzQBot Websocket]", "连接断开，将在 30s 后尝试重新连接, Code:", code);
       setTimeout(() => this.reconnectWebsocket(), 30 * 1000);
     });
     ws.on("error", (err) => {
       this._clearHeartbeatTimeout();
-      logger.error(
-        "[XzQBot Websocket]",
-        "连接发生错误，将在 30s 后尝试重新连接",
-        err,
-      );
+      logger.error("[XzQBot Websocket]", "连接发生错误，将在 30s 后尝试重新连接", err);
       setTimeout(() => this.reconnectWebsocket(), 30 * 1000);
     });
 
@@ -124,8 +105,7 @@ export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
         return;
       }
       if (e.post_type === "relay-welcome") this._XzQBotGroupRelayHandler(e);
-      else if (e.post_type === "relay-warning")
-        this._XzQBotGroupRelayHandler(e);
+      else if (e.post_type === "relay-warning") this._XzQBotGroupRelayHandler(e);
       else if (e.post_type === "message") this._messageHandler(e);
       else if (e.post_type === "message_sent") this._messageHandler(e);
       else if (e.post_type === "notice") this._notifyHandler(e);
@@ -137,9 +117,7 @@ export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
       }
     };
 
-    WebsocketUtils.createWsListener<OneBot.Events>(ws, "message", (e) =>
-      chooseHandler(e),
-    );
+    WebsocketUtils.createWsListener<OneBot.Events>(ws, "message", (e) => chooseHandler(e));
 
     // 默认 60s 心跳 （不可超过 60s)
     this._setNextHeartbeatTimeout(60 * 1000 + NETWORK_LATENCY_TOLERANCE);
@@ -150,28 +128,19 @@ export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
   }
 
   private _messageHandler(e: OneBot.MessageEvent | OneBot.MessageSentEvent) {
-    const formatMessage = (
-      message: OneBot.Messages,
-      at?: boolean,
-      reference?: boolean,
-    ): OneBot.SegmentMessages => {
+    const formatMessage = (message: OneBot.Messages, at?: boolean, reference?: boolean): OneBot.SegmentMessages => {
       let segmentMessages: OneBot.SegmentMessages;
       if (typeof message === "string") {
         segmentMessages = [this._textToSegmentMessage(message)];
       } else {
         segmentMessages = message;
       }
-      if (reference)
-        segmentMessages.unshift({ type: "reply", data: { id: e.message_id } });
-      if (at)
-        segmentMessages.unshift({ type: "at", data: { qq: e.sender.user_id } });
+      if (reference) segmentMessages.unshift({ type: "reply", data: { id: e.message_id } });
+      if (at) segmentMessages.unshift({ type: "at", data: { qq: e.sender.user_id } });
       return segmentMessages;
     };
     if (e.message_type === "group") {
-      const reply: ReplyFunction<OneBot.ActionOkResponse<"send_group_msg">> = (
-        message,
-        options,
-      ) =>
+      const reply: ReplyFunction<OneBot.ActionOkResponse<"send_group_msg">> = (message, options) =>
         this._action({
           action: "send_group_msg",
           params: {
@@ -181,9 +150,7 @@ export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
         });
       this.emit("group_message", e, reply);
     } else if (e.message_type === "private") {
-      const reply: ReplyFunction<
-        OneBot.ActionOkResponse<"send_private_msg">
-      > = (message, options) =>
+      const reply: ReplyFunction<OneBot.ActionOkResponse<"send_private_msg">> = (message, options) =>
         this._action({
           action: "send_private_msg",
           params: {
@@ -217,7 +184,12 @@ export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
   }
 
   private _metaEventHandler(e: OneBot.MetaEvent) {
-    if (!this.selfId) this.selfId = e.self_id;
+    if (this.selfId !== e.self_id) {
+      logger.warn("ID更正, 接收的id ->", e.self_id, "旧id ->", this.selfId);
+      logger.debug("通过元事件更正自己的 id ->", e.self_id);
+      this.selfId = e.self_id;
+    }
+
     if (e.meta_event_type === "heartbeat") {
       // logger.debug("收到心跳, interval ->", e.interval);
       if (this.heartbeatTimeout) this._clearHeartbeatTimeout();
@@ -241,10 +213,7 @@ export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
    */
   private _setNextHeartbeatTimeout(interval: number) {
     // logger.debug("设置下次心跳超时", new Date(Date.now() + interval));
-    this.heartbeatTimeout = setTimeout(
-      () => this._heartbeatTimeout(),
-      interval,
-    );
+    this.heartbeatTimeout = setTimeout(() => this._heartbeatTimeout(), interval);
   }
 
   /**
@@ -259,11 +228,8 @@ export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
     this.ws.send(JSON.stringify(data));
   }
 
-  private _send<A extends OneBot.Actions>(
-    params: OneBot.ActionPayload<A>,
-  ): Promise<OneBot.ActionOkResponse<A>> {
-    if (!this.connect())
-      return Promise.reject(new XzQBotSendError("Websocket is not connected"));
+  private _send<A extends OneBot.Actions>(params: OneBot.ActionPayload<A>): Promise<OneBot.ActionOkResponse<A>> {
+    if (!this.connect()) return Promise.reject(new XzQBotSendError("Websocket is not connected"));
 
     const echo = uuid();
     this.__send({ ...params, echo });

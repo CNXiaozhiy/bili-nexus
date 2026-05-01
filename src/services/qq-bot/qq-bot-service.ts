@@ -1,26 +1,23 @@
 import XzQBot, { ReplyFunction, XzQBotError, XzQBotSendError } from "@/core/bot/xz-qbot";
 import { GroupMessageEvent, MessageEvent, Messages, OneBotMessageUtils, PrivateMessageEvent, SegmentMessage, SegmentMessages } from "@/types/one-bot";
-import { LiveRoomInfo, LiveRoomStatus } from "@/types/bilibili";
+import { DynamicNewCardsMember, LiveRoomInfo, LiveRoomStatus } from "@/types/bilibili";
 import { QQBotError, QQBotServiceSetupError } from "@/types/errors/qq-bot";
 import getLogger from "@/utils/logger";
 import LiveAutomationManager, { UploadEventOptions } from "../live/live-automation-manager";
 import DynamicAutomationManager from "../dynamic/dynamic-automation-manager";
-import { liveConfigManager, qqBotConfigManager, userDynamicConfigManager } from "@/common";
+import { appConfigManager, liveConfigManager, qqBotConfigManager, userDynamicConfigManager } from "@/common";
 import { DataStore } from "@/common/config";
 import notifyEmitter from "@/core/app/notify-emitter";
 import { loginAccount } from "@/core/bilibili/account-login";
 import type LiveMonitor from "@/core/bilibili/live/live-monitor";
 import type LiveRecorder from "@/core/bilibili/live/live-recorder";
 import type VideoUploader from "@/core/bilibili/video/video-uploader";
-import type SpaceDynamicMonitor from "@/core/bilibili/dynamic/space-dynamic-monitor";
-import HtmlTemplatesRender from "@/core/render/html-template-render";
 import CommandProcessor from "@/utils/command-processor";
 import { screenshotSync } from "@/utils/ffmpeg";
 import FormatUtils from "@/utils/format";
 import BiliUtils from "@/utils/bili";
-
 import BiliAccountService from "../account/bili-account-service";
-import { getErrorImageBase64 } from "@/utils/render";
+import SpaceDynamicRender from "@/core/bilibili/dynamic/space-dynamic-render";
 
 const logger = getLogger("QQBotService");
 
@@ -33,13 +30,12 @@ type ProcessorContext<T, F = ReplyFunction<any>> = {
 };
 
 export default class QQBotService {
-  private htmlTemplatesRender = new HtmlTemplatesRender("./templates");
   private bot: XzQBot | null = null;
   private commandProcessor = new CommandProcessor<ProcessorContext<MessageEvent>, Messages | null>();
   private groupCommandProcessor = new CommandProcessor<ProcessorContext<GroupMessageEvent>, Messages | null>();
   private privateCommandProcessor = new CommandProcessor<ProcessorContext<PrivateMessageEvent>, Messages | null>();
 
-  constructor(private readonly liveAutomationManager: LiveAutomationManager, private readonly spaceDynamicMonitors: DynamicAutomationManager) {}
+  constructor(private readonly liveAutomationManager: LiveAutomationManager, private readonly dynamicAutomationManager: DynamicAutomationManager) {}
 
   public async init() {
     const websocketClient = qqBotConfigManager.get("websocketClient");
@@ -47,7 +43,7 @@ export default class QQBotService {
       throw new QQBotServiceSetupError("未配置 websocketClient.url, 请在 config/qq-bot.json 中配置后重启服务");
     }
 
-    this.bot = new XzQBot(websocketClient.url);
+    this.bot = new XzQBot(websocketClient.url, qqBotConfigManager.get("qq"));
 
     await this.bot.connect();
 
@@ -338,7 +334,7 @@ export default class QQBotService {
       qqBotConfigManager.set("userDynamic", usersDynamicConfig);
       userDynamicConfigManager.set("users", _usersDynamicConfig);
 
-      this.spaceDynamicMonitors.addUser(mid);
+      this.dynamicAutomationManager.addUser(mid);
 
       return "授权成功 ✅";
     };
@@ -1012,7 +1008,7 @@ export default class QQBotService {
 
         logger.info(`主播动态配置 ${mid} 已从配置文件中删除`);
 
-        this.spaceDynamicMonitors.removeUser(mid);
+        this.dynamicAutomationManager.removeUser(mid);
 
         logger.info(`直播间 -> spaceDynamicMonitors.removeUser`);
 
@@ -1081,11 +1077,11 @@ export default class QQBotService {
   private installEventListeners() {
     const liveMonitors = this.liveAutomationManager.getLiveMonitors();
     const liveRecorders = this.liveAutomationManager.getLiveRecorders();
-    const spaceDynamicMonitors = this.spaceDynamicMonitors.getSpaceDynamicMonitors();
 
     liveMonitors.forEach(this.installLiveMonitorEventListeners.bind(this));
     liveRecorders.forEach(this.installLiveRecorderEventListeners.bind(this));
-    spaceDynamicMonitors.forEach(this.installSpaceDynamicMonitorEventListeners.bind(this));
+
+    this.installDynamicAutomationManagerEventListeners();
 
     this.liveAutomationManager.on("new-monitor", (liveMonitor, roomId) => {
       logger.debug(`热装载 LiveMonitor 监听器`);
@@ -1098,10 +1094,6 @@ export default class QQBotService {
     this.liveAutomationManager.on("new-uploader", (videoUploader, hash, roomId) => {
       logger.debug(`收到新的投稿器, 热装载 VideoUploader 监听器`);
       this.installVideoUploaderEventListeners(videoUploader, hash, roomId);
-    });
-    this.spaceDynamicMonitors.on("new-monitor", (spaceDynamicMonitor, mid) => {
-      logger.debug(`热装载 SpaceDynamicMonitor 监听器`);
-      this.installSpaceDynamicMonitorEventListeners(spaceDynamicMonitor, mid);
     });
   }
 
@@ -1153,11 +1145,12 @@ export default class QQBotService {
           let unavailableGroupUserArr: number[] = [];
 
           if (shouldAtAll) {
+            logger.debug("需要At全体");
             atSegmentMessage = [OneBotMessageUtils.At("all")];
           } else {
             const targetUserArr = group.users;
 
-            logger.info("开始校验有效用户列表");
+            logger.info("通知用户组检查 -> 开始校验有效用户列表");
 
             let actualGroupMemberSet = new Set();
 
@@ -1165,7 +1158,7 @@ export default class QQBotService {
               const memberResult = await this.bot.getGroupMemberList(gid);
               actualGroupMemberSet = new Set(memberResult.data.map((e) => e.user_id));
             } catch (error) {
-              logger.error("获取群成员列表失败", error);
+              logger.error("通知用户组检查 -> 获取群成员列表失败", error);
             }
 
             const availableGroupUserArr = targetUserArr.filter((e) => actualGroupMemberSet.has(e));
@@ -1173,17 +1166,17 @@ export default class QQBotService {
             unavailableGroupUserArr = targetUserArr.filter((e) => !actualGroupMemberSet.has(e));
 
             if (availableGroupUserArr.length < targetUserArr.length) {
-              logger.warn("检测到不可用的用户 ->", unavailableGroupUserArr);
-              logger.warn("即将更新配置文件");
+              logger.warn("通知用户组检查 -> 检测到不可用的用户 ->", unavailableGroupUserArr);
+              logger.warn("通知用户组检查 -> 即将更新配置文件");
 
               roomConfig.group[gid].users = availableGroupUserArr;
               qqBotConfigManager.set("liveRoom", liveRoomsConfig);
-              logger.info(`已设置 ${gid} 的最新配置`);
+              logger.info(`通知用户组检查 -> 已设置 ${gid} 的最新配置✅`);
             } else {
-              logger.info("检测通过，均为存在用户");
+              logger.info("通知用户组检查 -> 检测通过，均为存在用户✅");
             }
 
-            atSegmentMessage = availableGroupUserArr.map<SegmentMessage>((qq) => {
+            atSegmentMessage = availableGroupUserArr.map((qq) => {
               return OneBotMessageUtils.At(qq);
             });
           }
@@ -1192,7 +1185,7 @@ export default class QQBotService {
 
           await this.bot.sendGroup(gid, [OneBotMessageUtils.Text("您订阅的直播间开始直播啦\n"), ...atSegmentMessage]);
 
-          logger.debug(`群聊通知完成 -> Group ${gid}`);
+          logger.debug(`群聊通知完成✅ -> Group ${gid}`);
 
           if (unavailableGroupUserArr.length > 0) {
             await this.bot.sendGroup(gid, [
@@ -1233,7 +1226,7 @@ export default class QQBotService {
 
           await this.bot.sendGroup(parseInt(gid), [OneBotMessageUtils.Text("您订阅的直播间已经结束直播啦")]);
 
-          logger.debug(`群聊通知完成 -> Group ${gid}`);
+          logger.debug(`群聊通知完成✅ -> Group ${gid}`);
         });
       }
     });
@@ -1245,14 +1238,14 @@ export default class QQBotService {
     liveRecorder.on("err", (error) => {});
   }
 
-  private installSpaceDynamicMonitorEventListeners(spaceDynamicMonitor: SpaceDynamicMonitor, mid: number) {
-    spaceDynamicMonitor.on("new", (dynamicId, dynamic) => {
+  private installDynamicAutomationManagerEventListeners() {
+    this.dynamicAutomationManager.on("new-dynamic", (mid, dynamicId, card) => {
       logger.debug(`收到 spaceDynamicMonitor 的事件 -> new, mid: ${mid}, dynamicId: ${dynamicId}`);
 
-      if (["DYNAMIC_TYPE_LIVE_RCMD", "DYNAMIC_TYPE_LIVE"].includes(dynamic.type)) {
-        logger.info(`收到直播通知类型动态，跳过通知`);
-        return;
-      }
+      // if ([].includes(dynamic.type)) {
+      //   logger.info(`收到直播通知类型动态，跳过通知`);
+      //   return;
+      // }
 
       const usersDynamicConfig = qqBotConfigManager.get("userDynamic");
       const userConfig = usersDynamicConfig[mid];
@@ -1288,7 +1281,9 @@ export default class QQBotService {
         try {
           const botUid = this.bot.getQID();
 
-          shouldAtAll = query.isOfficialGroup(mid, gid) && ["admin", "owner"].includes((await this.bot.getGroupMemberInfo(gid, botUid)).data.role);
+          shouldAtAll = !botUid
+            ? false
+            : query.isOfficialGroup(mid, gid) && ["admin", "owner"].includes((await this.bot.getGroupMemberInfo(gid, botUid)).data.role);
         } catch (e) {
           logger.warn(`判断是否需要At全体时出错:`, e);
         }
@@ -1300,7 +1295,7 @@ export default class QQBotService {
         } else {
           const targetUserArr = group.users;
 
-          logger.info("开始校验有效用户列表");
+          logger.info("通知用户组检查 -> 开始校验有效用户列表");
 
           let actualGroupMemberSet = new Set();
 
@@ -1308,7 +1303,7 @@ export default class QQBotService {
             const memberResult = await this.bot.getGroupMemberList(gid);
             actualGroupMemberSet = new Set(memberResult.data.map((e) => e.user_id));
           } catch (error) {
-            logger.error("获取群成员列表失败", error);
+            logger.error("通知用户组检查 -> 获取群成员列表失败", error);
           }
 
           const availableGroupUserArr = targetUserArr.filter((e) => actualGroupMemberSet.has(e));
@@ -1316,14 +1311,14 @@ export default class QQBotService {
           unavailableGroupUserArr = targetUserArr.filter((e) => !actualGroupMemberSet.has(e));
 
           if (availableGroupUserArr.length < targetUserArr.length) {
-            logger.warn("检测到不可用的用户 ->", unavailableGroupUserArr);
-            logger.warn("即将更新配置文件");
+            logger.warn("通知用户组检查 -> 检测到不可用的用户 ->", unavailableGroupUserArr);
+            logger.warn("通知用户组检查 -> 即将更新配置文件");
 
             userConfig.group[gid].users = availableGroupUserArr;
             qqBotConfigManager.set("liveRoom", usersDynamicConfig);
-            logger.info(`已设置 ${gid} 的最新配置`);
+            logger.info(`通知用户组检查 -> 已设置 ${gid} 的最新配置✅`);
           } else {
-            logger.info("检测通过，均为存在用户");
+            logger.info("通知用户组检查 -> 检测通过，均为存在用户✅");
           }
 
           atSegmentMessage = availableGroupUserArr.map<SegmentMessage>((qq) => {
@@ -1331,14 +1326,16 @@ export default class QQBotService {
           });
         }
 
-        await this.bot.sendGroup(gid, [OneBotMessageUtils.Base64Image(await Utils.renderNewDynamic(this.htmlTemplatesRender, dynamicId))]);
+        await this.bot.sendGroup(gid, await Utils.renderNewDynamic(card));
 
         await this.bot.sendGroup(gid, [
-          OneBotMessageUtils.Text(`UP发布新动态啦\n发布于: ${dynamic.modules.module_author.pub_time}\n\n`),
+          OneBotMessageUtils.Text(
+            `UP发布新动态啦\n发布于: ${FormatUtils.formatDurationWithoutSeconds(Date.now() - card.desc.timestamp * 1000).replaceAll(" ", "")}前\n\n`
+          ),
           ...atSegmentMessage,
         ]);
 
-        logger.debug(`群聊通知完成 -> Group ${gid}`);
+        logger.debug(`群聊通知完成✅ -> Group ${gid}`);
 
         if (unavailableGroupUserArr.length > 0) {
           await this.bot.sendGroup(gid, [
@@ -1385,7 +1382,7 @@ export default class QQBotService {
           ),
         ]);
 
-        logger.debug(`群聊通知完成 -> Group ${gid}`);
+        logger.debug(`群聊通知完成✅ -> Group ${gid}`);
       });
     }
 
@@ -1421,7 +1418,7 @@ export default class QQBotService {
             ),
           ]);
 
-          logger.debug(`群聊通知完成 -> Group ${gid}`);
+          logger.debug(`群聊通知完成✅ -> Group ${gid}`);
         });
       }
     });
@@ -1493,31 +1490,6 @@ class Utils {
     ];
   }
 
-  static async _renderLiveStatusTemplate(htmlTemplatesRender: HtmlTemplatesRender, roomInfo: LiveRoomInfo, liveHash: string) {
-    try {
-      const base64 = await htmlTemplatesRender.render("live_status_landscape", {
-        status: roomInfo.live_status,
-        background_image: roomInfo.background,
-        cover_image: roomInfo.user_cover,
-        parent_area_name: roomInfo.parent_area_name,
-        area_name: roomInfo.area_name,
-        live_time: roomInfo.live_status === LiveRoomStatus.LIVE ? roomInfo.live_time : "未开播",
-        title: roomInfo.title,
-        description: roomInfo.description,
-        popularity: roomInfo.online.toString(),
-        duration:
-          roomInfo.live_status === LiveRoomStatus.LIVE
-            ? FormatUtils.formatDurationDetailed(Date.now() - new Date(roomInfo.live_time).getTime())
-            : "未开播",
-        liveHash: liveHash,
-      });
-
-      return [OneBotMessageUtils.Base64Image(base64)];
-    } catch (e) {
-      return [OneBotMessageUtils.Base64Image(getErrorImageBase64())];
-    }
-  }
-
   static getLiveRoomStatusText(liveRoomStatus: LiveRoomStatus) {
     let status = "未知 ❓";
 
@@ -1532,11 +1504,13 @@ class Utils {
     return status;
   }
 
-  static async renderNewDynamic(htmlTemplatesRender: HtmlTemplatesRender, dynamicId: string | number) {
+  static async renderNewDynamic(card: DynamicNewCardsMember) {
     try {
-      return await htmlTemplatesRender.newDynamic(dynamicId);
+      const dynamicRenderConfig = appConfigManager.get("dynamicRender");
+      const base64 = await SpaceDynamicRender.render(dynamicRenderConfig, card, BiliAccountService.getDefault().getAccount().getCookie());
+      return [OneBotMessageUtils.Base64Image(base64)];
     } catch (e) {
-      return getErrorImageBase64();
+      return [OneBotMessageUtils.Text("渲染失败: " + e)];
     }
   }
 

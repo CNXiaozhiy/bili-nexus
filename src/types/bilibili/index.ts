@@ -1092,3 +1092,111 @@ export interface DynamicDetailCard {
     };
   };
 }
+
+export interface DynamicNew {
+  exist_gap: number; // 1
+  new_num: number; // 0
+  update_num: number; // 0
+  history_offset: number; // 1197119256467079174
+  max_dynamic_id: number; // 1197414763043225600
+  cards: DynamicNewCardsMember[];
+}
+
+export interface DynamicNewCardsMemberUserProfile {
+  info: {
+    uid: number; // 用户 mid / uid
+    uname: string; // 用户名
+    face: string; // 头像
+  };
+  card: {
+    official_verify: {
+      type: -1;
+    };
+  };
+  vip: {
+    vipType: number; // 是否vip
+    vipDueDate: number; // vip到期时间（时间戳）
+    dueRemark: "";
+    accessStatus: 0;
+    vipStatus: 1;
+    vipStatusWarn: "";
+    themeType: 0;
+    label: {
+      path: "http://i0.hdslb.com/bfs/vip/label_vip.png";
+      text: "大会员";
+      label_theme: "vip";
+      text_color: "#FFFFFF";
+      bg_style: 1;
+      bg_color: "#FB7299";
+      border_color: "";
+    };
+    avatar_subscript: 1;
+    nickname_color: "#FB7299";
+    role: 1;
+    avatar_subscript_url: "";
+  };
+  pendant: {
+    pid: 0;
+    name: "";
+    image: "";
+    expire: 0;
+    image_enhance: "";
+    image_enhance_frame: "";
+  };
+  rank: "10000";
+  sign: string; // 用户签名
+  level_info: {
+    current_level: 6;
+    current_min: 0;
+    current_exp: 0;
+    next_exp: "";
+  };
+}
+
+// 当前接口跟随动态类型动态变化
+export interface DynamicNewCardsMember {
+  desc: {
+    uid: number;
+    type: number; //动态类型
+    rid: number;
+    acl: number;
+    view: number; // 几个人看过
+    repost: number;
+    comment: number; // 评论数
+    like: number; // 点赞数
+    is_liked: number;
+    dynamic_id: number; // 动态ID
+    timestamp: number; // 发布时间戳
+    pre_dy_id: number;
+    orig_dy_id: number;
+    orig_type: number;
+    user_profile: DynamicNewCardsMemberUserProfile;
+    spec_type: number;
+    uid_type: number;
+    stype: number;
+    r_type: number;
+    inner_id: number;
+    status: number;
+    dynamic_id_str: string; // 文本动态ID
+    pre_dy_id_str: string; // 文本型数字（未知）
+    orig_dy_id_str: string; // 文本型数字（未知）
+    rid_str: string; // 文本型数字（未知）
+    origin: null;
+    bvid: string; // 投稿类型时候存在，否则为空字符串
+    previous: null;
+  };
+  card: string; // card JSON 文本内容（渲染卡片使用）
+  extend_json: string;
+  display: {
+    origin: null;
+    usr_action_txt: string;
+    relation: {
+      status: number;
+      is_follow: number;
+      is_followed: number;
+    };
+    live_info: null;
+    emoji_info: null;
+    highlight: null;
+  };
+}

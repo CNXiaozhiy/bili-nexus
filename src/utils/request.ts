@@ -1,9 +1,5 @@
-import axios, {
-  AxiosRequestConfig,
-  AxiosResponse,
-  InternalAxiosRequestConfig,
-  AxiosError,
-} from "axios";
+import axios, { AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig, AxiosError } from "axios";
+import JSONbig from "json-bigint";
 import getLogger from "./logger";
 import { throttledQueue } from "throttled-queue";
 
@@ -37,6 +33,16 @@ const instance = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  transformResponse: [
+    function (data) {
+      try {
+        // 使用 json-bigint 解析 (dynamic_id 精度损失)
+        return JSONbig({ storeAsString: true }).parse(data);
+      } catch (error) {
+        return data;
+      }
+    },
+  ],
 });
 
 // 判断是否应该重试的错误类型
@@ -81,15 +87,11 @@ function delay(ms: number): Promise<void> {
 
 // 重试请求
 async function retryRequest<T>(
-  getConfig: () =>
-    | ExtendedAxiosRequestConfig
-    | Promise<ExtendedAxiosRequestConfig>,
+  getConfig: () => ExtendedAxiosRequestConfig | Promise<ExtendedAxiosRequestConfig>,
   retryCount: number = 0
 ): Promise<AxiosResponse<T>> {
   try {
-    let config:
-      | ExtendedAxiosRequestConfig
-      | Promise<ExtendedAxiosRequestConfig>;
+    let config: ExtendedAxiosRequestConfig | Promise<ExtendedAxiosRequestConfig>;
     try {
       config = await getConfig();
     } catch (e) {
@@ -99,16 +101,11 @@ async function retryRequest<T>(
     const response = await instance.request<T>(config);
     if (config.shouldRetry && config.shouldRetry(response)) {
       const delayTime = calculateBackoffDelay(retryCount);
-      logger.warn(
-        `请求失败，触发用户自定义重试规则，第 ${
-          retryCount + 1
-        } 次重试，延迟 ${delayTime}ms`,
-        {
-          url: config.url,
-          status: response.status,
-          response: response.data,
-        }
-      );
+      logger.warn(`请求失败，触发用户自定义重试规则，第 ${retryCount + 1} 次重试，延迟 ${delayTime}ms`, {
+        url: config.url,
+        status: response.status,
+        response: response.data,
+      });
 
       await delay(delayTime);
       return retryRequest(getConfig, retryCount + 1);
@@ -127,21 +124,14 @@ async function retryRequest<T>(
     config.headers = config.headers || {};
 
     // 检查是否应该重试
-    if (
-      !config.headers["No-Retry"] &&
-      retryCount < MAX_RETRIES &&
-      shouldRetry(axiosError)
-    ) {
+    if (!config.headers["No-Retry"] && retryCount < MAX_RETRIES && shouldRetry(axiosError)) {
       const delayTime = calculateBackoffDelay(retryCount);
-      logger.warn(
-        `请求失败，第 ${retryCount + 1} 次重试，延迟 ${delayTime}ms`,
-        {
-          url: config.url,
-          status: axiosError.response?.status,
-          message: axiosError.message,
-          response: axiosError.response,
-        }
-      );
+      logger.warn(`请求失败，第 ${retryCount + 1} 次重试，延迟 ${delayTime}ms`, {
+        url: config.url,
+        status: axiosError.response?.status,
+        message: axiosError.message,
+        response: axiosError.response,
+      });
 
       await delay(delayTime);
       return retryRequest(getConfig, retryCount + 1);
@@ -170,79 +160,70 @@ instance.interceptors.request.use(async (config) => {
 // Http Logger - interceptors
 
 if (process.env.NODE_ENV === "development") {
-  instance.interceptors.request.use(
-    async (config: InternalAxiosRequestConfig) => {
-      const requestLog = {
-        timestamp: new Date().toISOString(),
-        method: config.method?.toUpperCase(),
-        url: config.url,
-        baseURL: config.baseURL,
-        headers: config.headers,
-        params: config.params,
-        data: config.data,
-        timeout: config.timeout,
-        withCredentials: config.withCredentials,
-        auth: config.auth,
-      };
+  instance.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+    const requestLog = {
+      timestamp: new Date().toISOString(),
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      headers: config.headers,
+      params: config.params,
+      data: config.data,
+      timeout: config.timeout,
+      withCredentials: config.withCredentials,
+      auth: config.auth,
+    };
 
-      httpLogger.info("=== HTTP Request ===");
-      httpLogger.info(`Time Stamp: ${requestLog.timestamp}`);
-      httpLogger.info(`${requestLog.method} ${requestLog.url}`);
+    httpLogger.info("=== HTTP Request ===");
+    httpLogger.info(`Time Stamp: ${requestLog.timestamp}`);
+    httpLogger.info(`${requestLog.method} ${requestLog.url}`);
 
-      if (requestLog.baseURL) {
-        httpLogger.info(`Base URL: ${requestLog.baseURL}`);
-      }
-
-      if (requestLog.params && Object.keys(requestLog.params).length > 0) {
-        httpLogger.info(
-          "Query Parameters:",
-          JSON.stringify(requestLog.params, null, 2)
-        );
-      }
-
-      if (requestLog.headers) {
-        const filteredHeaders = { ...requestLog.headers };
-        // if (filteredHeaders.Authorization || filteredHeaders.authorization) {
-        //   filteredHeaders.Authorization = "[FILTERED]";
-        //   filteredHeaders.authorization = "[FILTERED]";
-        // }
-
-        httpLogger.info("Headers:", JSON.stringify(filteredHeaders, null, 2));
-      }
-
-      if (requestLog.data) {
-        let dataToLog = requestLog.data;
-
-        if (typeof dataToLog === "string") {
-          try {
-            const parsed = JSON.parse(dataToLog);
-            httpLogger.info("Request Body:", JSON.stringify(parsed, null, 2));
-          } catch {
-            httpLogger.info(
-              "Request Body:",
-              dataToLog.substring(0, 1000) +
-                (dataToLog.length > 1000 ? "... (truncated)" : "")
-            );
-          }
-        } else if (dataToLog instanceof FormData) {
-          // FormData
-          const formDataObj: Record<string, any> = {};
-          dataToLog.forEach((value, key) => {
-            formDataObj[key] = value;
-          });
-          httpLogger.info("FormData:", JSON.stringify(formDataObj, null, 2));
-        } else if (typeof dataToLog === "object") {
-          httpLogger.info("Request Body:", JSON.stringify(dataToLog, null, 2));
-        } else {
-          httpLogger.info("Request Body:", String(dataToLog));
-        }
-      }
-
-      httpLogger.info("===================\n");
-
-      return config;
+    if (requestLog.baseURL) {
+      httpLogger.info(`Base URL: ${requestLog.baseURL}`);
     }
-  );
+
+    if (requestLog.params && Object.keys(requestLog.params).length > 0) {
+      httpLogger.info("Query Parameters:", JSON.stringify(requestLog.params, null, 2));
+    }
+
+    if (requestLog.headers) {
+      const filteredHeaders = { ...requestLog.headers };
+      // if (filteredHeaders.Authorization || filteredHeaders.authorization) {
+      //   filteredHeaders.Authorization = "[FILTERED]";
+      //   filteredHeaders.authorization = "[FILTERED]";
+      // }
+
+      httpLogger.info("Headers:", JSON.stringify(filteredHeaders, null, 2));
+    }
+
+    if (requestLog.data) {
+      let dataToLog = requestLog.data;
+
+      if (typeof dataToLog === "string") {
+        try {
+          const parsed = JSON.parse(dataToLog);
+          httpLogger.info("Request Body:", JSON.stringify(parsed, null, 2));
+        } catch {
+          httpLogger.info("Request Body:", dataToLog.substring(0, 1000) + (dataToLog.length > 1000 ? "... (truncated)" : ""));
+        }
+      } else if (dataToLog instanceof FormData) {
+        // FormData
+        const formDataObj: Record<string, any> = {};
+        dataToLog.forEach((value, key) => {
+          formDataObj[key] = value;
+        });
+        httpLogger.info("FormData:", JSON.stringify(formDataObj, null, 2));
+      } else if (typeof dataToLog === "object") {
+        httpLogger.info("Request Body:", JSON.stringify(dataToLog, null, 2));
+      } else {
+        httpLogger.info("Request Body:", String(dataToLog));
+      }
+    }
+
+    httpLogger.info("===================\n");
+
+    return config;
+  });
 
   instance.interceptors.response.use(
     (response: AxiosResponse) => {
@@ -267,12 +248,8 @@ if (process.env.NODE_ENV === "development") {
 
       httpLogger.info("=== HTTP Response ===");
       httpLogger.info(`Time Stamp: ${responseLog.timestamp}`);
-      httpLogger.info(
-        `${responseLog.request.method} ${responseLog.request.url}`
-      );
-      httpLogger.info(
-        `Status: ${responseLog.response.status} ${responseLog.response.statusText}`
-      );
+      httpLogger.info(`${responseLog.request.method} ${responseLog.request.url}`);
+      httpLogger.info(`Status: ${responseLog.response.status} ${responseLog.response.statusText}`);
 
       if (responseLog.response.headers) {
         const filteredHeaders = { ...responseLog.response.headers };
@@ -296,19 +273,13 @@ if (process.env.NODE_ENV === "development") {
           } catch {
             const maxLength = 2000;
             if (responseData.length > maxLength) {
-              httpLogger.info(
-                "Response Body (truncated):",
-                responseData.substring(0, maxLength) + "..."
-              );
+              httpLogger.info("Response Body (truncated):", responseData.substring(0, maxLength) + "...");
             } else {
               httpLogger.info("Response Body:", responseData);
             }
           }
         } else if (typeof responseData === "object") {
-          httpLogger.info(
-            "Response Body:",
-            JSON.stringify(responseData, null, 2)
-          );
+          httpLogger.info("Response Body:", JSON.stringify(responseData, null, 2));
         } else {
           httpLogger.info("Response Body:", String(responseData));
         }
@@ -345,12 +316,8 @@ if (process.env.NODE_ENV === "development") {
         httpLogger.error("=== HTTP Error Response ===");
         httpLogger.error(`Time Stamp: ${errorLog.timestamp}`);
         httpLogger.error(`${errorLog.request.method} ${errorLog.request.url}`);
-        httpLogger.error(
-          `Status: ${errorLog.response.status} ${errorLog.response.statusText}`
-        );
-        httpLogger.error(
-          `Error: ${errorLog.error.message} (${errorLog.error.code})`
-        );
+        httpLogger.error(`Status: ${errorLog.response.status} ${errorLog.response.statusText}`);
+        httpLogger.error(`Error: ${errorLog.error.message} (${errorLog.error.code})`);
 
         if (errorLog.response.data) {
           const errorData = errorLog.response.data;
@@ -358,26 +325,17 @@ if (process.env.NODE_ENV === "development") {
           if (typeof errorData === "string") {
             try {
               const parsed = JSON.parse(errorData);
-              httpLogger.error(
-                "Error Response Body:",
-                JSON.stringify(parsed, null, 2)
-              );
+              httpLogger.error("Error Response Body:", JSON.stringify(parsed, null, 2));
             } catch {
               const maxLength = 2000;
               if (errorData.length > maxLength) {
-                httpLogger.error(
-                  "Error Response Body (truncated):",
-                  errorData.substring(0, maxLength) + "..."
-                );
+                httpLogger.error("Error Response Body (truncated):", errorData.substring(0, maxLength) + "...");
               } else {
                 httpLogger.error("Error Response Body:", errorData);
               }
             }
           } else if (typeof errorData === "object") {
-            httpLogger.error(
-              "Error Response Body:",
-              JSON.stringify(errorData, null, 2)
-            );
+            httpLogger.error("Error Response Body:", JSON.stringify(errorData, null, 2));
           } else {
             httpLogger.error("Error Response Body:", String(errorData));
           }
@@ -390,9 +348,7 @@ if (process.env.NODE_ENV === "development") {
 
         httpLogger.error("=== HTTP Request Failed ===");
         httpLogger.error(`Time Stamp: ${new Date().toISOString()}`);
-        httpLogger.error(
-          `${requestConfig.method?.toUpperCase()} ${requestConfig.url}`
-        );
+        httpLogger.error(`${requestConfig.method?.toUpperCase()} ${requestConfig.url}`);
         httpLogger.error(`Error: ${error.message}`);
         httpLogger.error("No response received from server");
         httpLogger.error("==========================\n");
@@ -425,17 +381,10 @@ instance.interceptors.response.use(
 
 // 封装
 const request = {
-  async get<T = any>(
-    url: string,
-    config?: ExtendedAxiosRequestConfig
-  ): Promise<AxiosResponse<T>> {
+  async get<T = any>(url: string, config?: ExtendedAxiosRequestConfig): Promise<AxiosResponse<T>> {
     return retryRequest<T>(() => ({ ...config, method: "GET", url }));
   },
-  async post<T = any>(
-    url: string,
-    config?: ExtendedAxiosRequestConfig,
-    getData?: (() => any | Promise<any>) | any
-  ): Promise<AxiosResponse<T>> {
+  async post<T = any>(url: string, config?: ExtendedAxiosRequestConfig, getData?: (() => any | Promise<any>) | any): Promise<AxiosResponse<T>> {
     return retryRequest<T>(async () => {
       return {
         ...config,
@@ -445,11 +394,7 @@ const request = {
       };
     });
   },
-  async put<T = any>(
-    url: string,
-    config?: ExtendedAxiosRequestConfig,
-    getData?: (() => any | Promise<any>) | any
-  ): Promise<AxiosResponse<T>> {
+  async put<T = any>(url: string, config?: ExtendedAxiosRequestConfig, getData?: (() => any | Promise<any>) | any): Promise<AxiosResponse<T>> {
     return retryRequest<T>(async () => {
       return {
         ...config,
@@ -459,10 +404,7 @@ const request = {
       };
     });
   },
-  async delete<T = any>(
-    url: string,
-    config?: ExtendedAxiosRequestConfig
-  ): Promise<AxiosResponse<T>> {
+  async delete<T = any>(url: string, config?: ExtendedAxiosRequestConfig): Promise<AxiosResponse<T>> {
     return retryRequest<T>(() => ({ ...config, method: "DELETE", url }));
   },
   instance,

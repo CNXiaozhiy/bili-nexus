@@ -1,7 +1,11 @@
 export interface AppConfig {
   ffmpegBinPath: string;
-  chromeBinPath: string;
   recordingDir: string;
+  dynamicRender: {
+    enable: boolean;
+    host: string;
+    port: number;
+  };
 }
 
 export interface BiliConfig {
@@ -79,6 +83,7 @@ export type DataStore<T = string> = Record<T, SubscriptionConfig>;
 // 适配器
 export interface QQBotConfig {
   enable: boolean;
+  qq: number;
   websocketClient: {
     url: string;
     retryDelay: number;
