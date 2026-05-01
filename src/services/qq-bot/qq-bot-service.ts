@@ -517,6 +517,17 @@ export default class QQBotService {
       return null;
     });
 
+    this.commandProcessor.register(".bn", async (args, context) => {
+      const mainServerHealth = true;
+      const spaceDynamicRenderHealth = await SpaceDynamicRender.health(appConfigManager.get("dynamicRender"));
+
+      return (
+        `BiliNexus 服务状态\n\n` +
+        `⚙️ 主服务: ${mainServerHealth ? "正常✅" : "异常❌"}\n` +
+        `⚙️ 动态渲染服务: ${spaceDynamicRenderHealth ? "正常✅" : "异常❌"}`
+      );
+    });
+
     this.groupCommandProcessor.register("一键订阅", async (args, context) => {
       const oneClickSubscribe = canOneClickSubscribe(context.event.group_id);
       if (!oneClickSubscribe.can) {
