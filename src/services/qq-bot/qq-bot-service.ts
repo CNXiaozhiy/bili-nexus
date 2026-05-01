@@ -18,6 +18,7 @@ import FormatUtils from "@/utils/format";
 import BiliUtils from "@/utils/bili";
 import BiliAccountService from "../account/bili-account-service";
 import SpaceDynamicRender from "@/core/bilibili/dynamic/space-dynamic-render";
+import { getVersion } from "../version";
 
 const logger = getLogger("QQBotService");
 
@@ -524,7 +525,8 @@ export default class QQBotService {
       return (
         `BiliNexus 服务状态\n\n` +
         `⚙️ 主服务: ${mainServerHealth ? "正常✅" : "异常❌"}\n` +
-        `⚙️ 动态渲染服务: ${spaceDynamicRenderHealth ? "正常✅" : "异常❌"}`
+        `⚙️ 动态渲染服务: ${spaceDynamicRenderHealth ? "正常✅" : "异常❌"}` +
+        `\n\nPowered by BN v${getVersion()}`
       );
     });
 
