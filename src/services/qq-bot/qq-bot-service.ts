@@ -311,7 +311,7 @@ export default class QQBotService {
       return "授权成功 ✅";
     };
 
-    const initUserDynamic = (mid: number) => {
+    const initUserDynamic = (mid: string) => {
       const usersDynamicConfig = qqBotConfigManager.get("userDynamic");
       const _usersDynamicConfig = userDynamicConfigManager.get("users");
 
@@ -361,7 +361,7 @@ export default class QQBotService {
       }
 
       try {
-        const msg = initUserDynamic(userInfo.mid);
+        const msg = initUserDynamic(userInfo.mid.toString());
         _messages[1] = `UP主动态 ${msg}`;
       } catch (e) {
         const err = e as string;
@@ -919,7 +919,7 @@ export default class QQBotService {
       const messages: string[] = [];
 
       for (let _user of users) {
-        const mid = parseInt(_user);
+        const mid = _user;
 
         try {
           const msg = initUserDynamic(mid);
@@ -1003,7 +1003,7 @@ export default class QQBotService {
       for (let _user of users) {
         logger.info(`解约用户动态 -> ${_user}`);
 
-        const mid = parseInt(_user);
+        const mid = _user;
 
         const usersDynamicConfig = qqBotConfigManager.get("userDynamic");
         const _usersDynamicConfig = userDynamicConfigManager.get("users");
@@ -1198,7 +1198,7 @@ export default class QQBotService {
 
           await this.bot.sendGroup(gid, [OneBotMessageUtils.Text("您订阅的直播间开始直播啦\n"), ...atSegmentMessage]);
 
-          logger.debug(`群聊通知完成✅ -> Group ${gid}`);
+          logger.debug(`群聊通知完成✅ -> Group ${gid}, 通知用户数: ${atSegmentMessage.length}`);
 
           if (unavailableGroupUserArr.length > 0) {
             await this.bot.sendGroup(gid, [
@@ -1300,6 +1300,7 @@ export default class QQBotService {
         } catch (e) {
           logger.warn(`判断是否需要At全体时出错:`, e);
         }
+
         let atSegmentMessage: SegmentMessage[] = [];
         let unavailableGroupUserArr: number[] = [];
 
@@ -1343,12 +1344,12 @@ export default class QQBotService {
 
         await this.bot.sendGroup(gid, [
           OneBotMessageUtils.Text(
-            `UP发布新动态啦\n发布于: ${FormatUtils.formatDurationWithoutSeconds(Date.now() - card.desc.timestamp * 1000).replaceAll(" ", "")}前\n\n`
+            `UP发布新动态啦\n发布于: ${FormatUtils.formatDurationWithoutSeconds(Date.now() - card.desc.timestamp * 1000)}前\n\n`
           ),
           ...atSegmentMessage,
         ]);
 
-        logger.debug(`群聊通知完成✅ -> Group ${gid}`);
+        logger.debug(`群聊通知完成✅ -> Group ${gid}, 通知用户数: ${atSegmentMessage.length}`);
 
         if (unavailableGroupUserArr.length > 0) {
           await this.bot.sendGroup(gid, [
@@ -1709,7 +1710,7 @@ class SubscriptionQuery<T extends DataStore<string>> {
    * @param groupId 群组ID
    * @returns 是否为官方群组
    */
-  isOfficialGroup(resourceId: number, groupId: number): boolean {
+  isOfficialGroup(resourceId: number | string, groupId: number): boolean {
     const config = this.data[resourceId.toString()];
     if (!config) return false;
 

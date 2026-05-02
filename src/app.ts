@@ -139,7 +139,7 @@ export class App {
     this.dynamicAutomationManager = new DynamicAutomationManager(defaultBiliAccount);
     const users = userDynamicConfigManager.get("users");
     for (const uid in users) {
-      this.dynamicAutomationManager.addUser(parseInt(uid));
+      this.dynamicAutomationManager.addUser(uid);
     }
 
     this.dynamicAutomationManager.startMonitor();

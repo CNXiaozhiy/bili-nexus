@@ -6,22 +6,22 @@ import { DynamicNewCardsMember } from "@/types/bilibili";
 const logger = getLogger("DynamicAutomationManager");
 
 export interface DynamicAutomationManagerEvents {
-  "new-user": [mid: number];
-  "remove-user": [mid: number];
-  "new-dynamic": [mid: number, dynamicId: number, card: DynamicNewCardsMember];
+  "new-user": [mid: string];
+  "remove-user": [mid: string];
+  "new-dynamic": [mid: string, dynamicId: string, card: DynamicNewCardsMember];
 }
 
 export default class DynamicAutomationManager extends EventEmitter<DynamicAutomationManagerEvents> {
-  private users = new Set<number>();
+  private users = new Set<string>();
   private isRunning = false;
   private startMonitorTime = 0; // s
-  private latestDynamicMap = new Map<number, number>(); // uid -> timestamp
+  private latestDynamicMap = new Map<string, number>(); // uid -> timestamp
 
   constructor(private readonly biliAccount: BiliAccount) {
     super();
   }
 
-  public addUser(mid: number) {
+  public addUser(mid: string) {
     if (this.users.has(mid)) {
       logger.debug(`用户已添加过, 跳过`);
       return;
@@ -33,14 +33,14 @@ export default class DynamicAutomationManager extends EventEmitter<DynamicAutoma
     this.emit("new-user", mid);
   }
 
-  public removeUser(mid: number) {
+  public removeUser(mid: string) {
     if (!this.users.has(mid)) {
       logger.debug(`用户未添加过, 跳过`);
       return;
     }
 
     logger.debug(`移除用户 ${mid}`);
-    this.users.delete(mid);
+    this.users.delete(mid.toString());
     this.emit("remove-user", mid);
     logger.debug(`发射事件 remove-user -> ${mid}`);
   }
@@ -55,6 +55,7 @@ export default class DynamicAutomationManager extends EventEmitter<DynamicAutoma
     this.isRunning = true;
     this.pool();
 
+    logger.debug("this.startMonitorTime ->", this.startMonitorTime);
     logger.info(`动态监控自动化已启动 ✅`);
   }
 
@@ -77,7 +78,7 @@ export default class DynamicAutomationManager extends EventEmitter<DynamicAutoma
         for (let i = 0; i < data.cards.length; i++) {
           const card = data.cards[i];
 
-          const uid = card.desc.uid;
+          const uid = card.desc.uid.toString();
           const dynamicId = card.desc.dynamic_id;
           const timestamp = card.desc.timestamp;
 

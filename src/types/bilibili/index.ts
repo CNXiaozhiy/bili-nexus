@@ -1156,7 +1156,7 @@ export interface DynamicNewCardsMemberUserProfile {
 // 当前接口跟随动态类型动态变化
 export interface DynamicNewCardsMember {
   desc: {
-    uid: number;
+    uid: number | string;
     type: number; //动态类型
     rid: number;
     acl: number;
@@ -1165,7 +1165,7 @@ export interface DynamicNewCardsMember {
     comment: number; // 评论数
     like: number; // 点赞数
     is_liked: number;
-    dynamic_id: number; // 动态ID
+    dynamic_id: string; // 动态ID (jsonBig转换后的字符串)
     timestamp: number; // 发布时间戳
     pre_dy_id: number;
     orig_dy_id: number;
