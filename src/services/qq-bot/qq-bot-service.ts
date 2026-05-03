@@ -1343,9 +1343,7 @@ export default class QQBotService {
         await this.bot.sendGroup(gid, await Utils.renderNewDynamic(card));
 
         await this.bot.sendGroup(gid, [
-          OneBotMessageUtils.Text(
-            `UP发布新动态啦\n发布于: ${FormatUtils.formatDurationWithoutSeconds(Date.now() - card.desc.timestamp * 1000)}前\n\n`
-          ),
+          OneBotMessageUtils.Text(`UP发布新动态啦\n发布于: ${FormatUtils.formatTimeAgo(Date.now() - card.desc.timestamp * 1000)}\n\n`),
           ...atSegmentMessage,
         ]);
 
