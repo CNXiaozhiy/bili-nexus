@@ -86,15 +86,13 @@ export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
   }
 
   private installListener(ws: WebSocket) {
-    ws.on("close", (code) => {
+    ws.on("close", (code, reason) => {
       this._clearHeartbeatTimeout();
-      logger.warn("[XzQBot Websocket]", "连接断开，将在 30s 后尝试重新连接, Code:", code);
+      logger.warn("Websocket 连接断开，将在 30s 后尝试重新连接, Code:", code, "Reason:", reason);
       setTimeout(() => this.reconnectWebsocket(), 30 * 1000);
     });
     ws.on("error", (err) => {
-      this._clearHeartbeatTimeout();
-      logger.error("[XzQBot Websocket]", "连接发生错误，将在 30s 后尝试重新连接", err);
-      setTimeout(() => this.reconnectWebsocket(), 30 * 1000);
+      logger.error("Websocket 连接发生错误", err);
     });
 
     const chooseHandler = (e: OneBot.Events) => {
@@ -220,7 +218,7 @@ export class AbsXzQBot extends EventEmitter<XzQBotEvents> {
    * 机器人心跳超时
    */
   private _heartbeatTimeout() {
-    logger.warn("[XzQBot Websocket]", "心跳超时, 尝试重连...");
+    logger.warn("Websocket 心跳超时, 断开连接");
     this.ws.close();
   }
 
