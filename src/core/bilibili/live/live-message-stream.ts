@@ -292,7 +292,7 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
         case 3:
           // 心跳包回复
           const popularity = packet.body.readUInt32BE(0);
-          this.logger.debug(`收到心跳包回复，popularity: ${popularity}`);
+          // this.logger.debug(`收到心跳包回复，popularity: ${popularity}`);
           break;
         case 5:
           // 普通命令包
