@@ -371,7 +371,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
               logger.info(`${hash} 录制为异常结束`);
               recorder.retryRecord();
             } else {
-              logger.debug(`${hash} 录制为正常结束, 由liveMonitor的live-end事件Handler处理剩余事务`);
+              logger.debug(`${hash} 录制为正常结束, 由 handleLiveEnd 处理剩余事务`);
             }
           });
       });
@@ -473,14 +473,14 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
           logger.debug(`清理负责 ${hash} 的录制器完成 ✅`);
         }
 
-        logger.debug("liveMonitor.event.live-end's Handler -> 放弃剩余事务");
+        logger.debug("handleLiveEnd -> 放弃剩余事务");
         return;
       }
 
       const recorder = this.liveRecorders.get(hash);
 
       if (!recorder) {
-        logger.debug(`未找到 ${hash} 的录制器, liveMonitor.event.live-end's Handler -> 放弃剩余事务`);
+        logger.debug(`未找到 ${hash} 的录制器, handleLiveEnd -> 放弃剩余事务`);
         return;
       }
 
