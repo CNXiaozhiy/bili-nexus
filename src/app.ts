@@ -99,7 +99,7 @@ export class App {
     } else {
       // 注册默认账号
       defaultBiliAccount = BiliAccountService.registerDefault(
-        new UserAccount(defaultAccount, accounts[defaultAccount].cookie, accounts[defaultAccount].refresh_token)
+        new UserAccount(defaultAccount, accounts[defaultAccount].cookie, accounts[defaultAccount].refresh_token),
       );
     }
 
@@ -114,10 +114,33 @@ export class App {
 
     logger.debug("BiliAccountService 初始化完成");
 
-    // 初始化 LiveAutomationManager
-    const rooms = liveConfigManager.get("rooms");
+    // 实例化类（初始化应在通知型服务之后）
     this.liveAutomationManager = new LiveAutomationManager(defaultBiliAccount);
+    logger.info("LiveAutomationManager 实例化成功✔️");
 
+    this.dynamicAutomationManager = new DynamicAutomationManager(defaultBiliAccount);
+    logger.info("DynamicAutomationManager 实例化完成✔️");
+
+    // 初始化 QQBotService
+    if (qqBotConfigManager.get("enable")) {
+      this.qqBotService = new QQBotService(this.liveAutomationManager, this.dynamicAutomationManager);
+      try {
+        await this.qqBotService.init();
+        logger.info("QQBotService 初始化成功✔️");
+      } catch (e) {
+        logger.error("QQBotService 初始化失败❌", e);
+        process.exit(1);
+      }
+    } else {
+      logger.warn(`QQBotService 适配器 -> 已禁用🚫`);
+    }
+
+    logger.debug("通知型服务初始化完成✔️");
+
+    // 初始化 LiveAutomationManager
+    logger.info("开始初始化 LiveAutomationManager⏳");
+
+    const rooms = liveConfigManager.get("rooms");
     for (const roomId in rooms) {
       if (!rooms[roomId].enable) {
         logger.info(`房间 ${roomId} 已禁用 ${rooms}`);
@@ -129,14 +152,11 @@ export class App {
       });
     }
 
-    logger.debug("LiveAutomationManager 初始化完成");
-
-    logger.info("正在等待 LiveMonitors 全部 Pool 完成");
-    await this.liveAutomationManager.awaitLiveMonitorsPool();
-    logger.info("LiveMonitors 全部 Pool 完成 ✅");
+    logger.debug("LiveAutomationManager 初始化完成✔️");
 
     // 初始化 DynamicAutomationManager
-    this.dynamicAutomationManager = new DynamicAutomationManager(defaultBiliAccount);
+    logger.info("开始初始化 DynamicAutomationManager⏳");
+
     const users = userDynamicConfigManager.get("users");
     for (const uid in users) {
       this.dynamicAutomationManager.addUser(uid);
@@ -144,23 +164,7 @@ export class App {
 
     this.dynamicAutomationManager.startMonitor();
 
-    logger.debug("SpaceDynamicMonitor 初始化完成");
-
-    // 初始化 QQBotService
-    if (qqBotConfigManager.get("enable")) {
-      this.qqBotService = new QQBotService(this.liveAutomationManager, this.dynamicAutomationManager);
-      try {
-        await this.qqBotService.init();
-        logger.info("QQBotService 初始化成功");
-      } catch (e) {
-        logger.error("QQBotService 初始化失败", e);
-        process.exit(1);
-      }
-    } else {
-      logger.warn(`QQBotService 适配器 -> 已禁用`);
-    }
-
-    logger.debug("QQBotService 初始化完成");
+    logger.debug("SpaceDynamicMonitor 初始化完成✔️");
 
     return;
   }

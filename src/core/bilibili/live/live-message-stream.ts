@@ -4,7 +4,7 @@ import WebSocket, { EventEmitter } from "ws";
 import { BiliAccount } from "@/core/bilibili/bili-account";
 import getLogger from "@/utils/logger";
 
-const logger = getLogger("LiveMessageStreamClient");
+// const logger = getLogger("LiveMessageStreamClient");
 
 class LiveMessageStreamError extends Error {}
 class ParsePacketError extends LiveMessageStreamError {}
@@ -100,7 +100,7 @@ export interface CommandDataMap {
         }, // 弹幕补充信息
         unknown, // 活动相关信息?
         number, // 0?
-        null // unknown
+        null, // unknown
       ],
       string, // 弹幕文本
       [
@@ -111,9 +111,9 @@ export interface CommandDataMap {
         number, // 0?
         number, // 用户权限等级?
         number, // unknown
-        string // unknown
+        string, // unknown
       ],
-      []
+      [],
     ];
     msg_id?: string;
     p_is_ack?: boolean;
@@ -184,6 +184,8 @@ interface ParsedPacket {
 }
 
 export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStreamClientEvents> {
+  private logger;
+
   private websocketClient: WebSocket | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private sequence: number = 1;
@@ -192,15 +194,14 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
 
   constructor(roomId: number, account: BiliAccount) {
     super();
+    this.logger = getLogger("LiveMessageStreamClient." + roomId);
     this.roomId = roomId;
     this.account = account;
   }
 
   public async connect(): Promise<void> {
     try {
-      const danmuInfo = await this.account
-        .getBiliApi()
-        .getDanmuInfo(this.roomId);
+      const danmuInfo = await this.account.getBiliApi().getDanmuInfo(this.roomId);
       const host = danmuInfo.host_list[0];
       const wsUrl = `wss://${host.host}:${host.wss_port}/sub`;
 
@@ -211,12 +212,12 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
       // 设置连接超时
       setTimeout(() => {
         if (this.websocketClient?.readyState !== WebSocket.OPEN) {
-          logger.error("连接超时");
+          this.logger.error("连接超时");
           this.disconnect();
         }
       }, 10000);
     } catch (error) {
-      logger.error("初始化错误:", error);
+      this.logger.error("初始化错误:", error);
       throw error;
     }
   }
@@ -233,38 +234,39 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
     }
   }
 
+  public destroy(): void {
+    this.disconnect();
+    this.removeAllListeners();
+  }
+
   private setupEventListeners(token: string): void {
     if (!this.websocketClient) return;
 
     this.websocketClient.on("open", () => {
-      logger.info(`已连接到直播间信息流通道 ${this.roomId}`);
+      this.logger.info(`已连接到直播间信息流通道✔️`);
       this.emit("WS_open", this.websocketClient!);
 
-      const authPacket = this.createAuthPacket(
-        this.roomId,
-        token,
-        this.account.getAccount().getUid()
-      );
+      const authPacket = this.createAuthPacket(this.roomId, token, this.account.getAccount().getUid());
       this.websocketClient?.send(authPacket);
 
-      logger.info("认证数据包已发送");
+      this.logger.debug("认证数据包已发送✔️");
 
       this.heartbeatInterval = setInterval(() => {
         this.sequence++;
         const heartbeatPacket = this.createHeartbeatPacket(this.sequence);
         this.websocketClient?.send(heartbeatPacket);
-        // logger.debug(`心跳包已发送，sequence: ${this.sequence}`);
+        // this.logger.debug(`心跳包已发送，sequence: ${this.sequence}`);
       }, 30000);
     });
 
     this.websocketClient.on("close", (code) => {
-      logger.warn(`与直播间 ${this.roomId} 的信息流连接已断开`);
+      this.logger.warn(`与直播间 ${this.roomId} 的信息流连接已断开`);
       this.disconnect();
       this.emit("WS_close", code);
     });
 
     this.websocketClient.on("error", (error: Error) => {
-      logger.error("WebSocket错误:", error);
+      this.logger.error("WebSocket错误:", error);
       this.emit("WS_error", error);
     });
 
@@ -272,7 +274,7 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
       if (Buffer.isBuffer(data)) {
         this.handleIncomingData(data);
       } else {
-        logger.error("数据非 Buffer", data);
+        this.logger.error("数据非 Buffer", data);
       }
     });
   }
@@ -281,7 +283,7 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
     try {
       const packet = this.parsePacket(data);
 
-      //   logger.debug(
+      //   this.logger.debug(
       //     `收到数据包: 操作码=${packet.operation}, 协议版本=${packet.protocolVersion}`
       //   );
 
@@ -290,7 +292,7 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
         case 3:
           // 心跳包回复
           const popularity = packet.body.readUInt32BE(0);
-          logger.debug(`收到心跳包回复，人气值: ${popularity}`);
+          this.logger.debug(`收到心跳包回复，popularity: ${popularity}`);
           break;
         case 5:
           // 普通命令包
@@ -300,35 +302,32 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
           // 认证包回复
           try {
             const reply: AuthReply = JSON.parse(packet.body.toString("utf-8"));
-            logger.debug("认证回复:", reply);
+            this.logger.debug("认证回复:", reply);
 
             if (reply.code === 0) {
-              logger.info("认证成功");
+              this.logger.info("认证成功✔️");
               this.emit("CLIENT_OK");
             } else {
-              logger.error("认证失败:", reply);
+              this.logger.error("认证失败:", reply);
             }
           } catch (error) {
-            logger.error("无法解析认证回复", error);
+            this.logger.error("无法解析认证回复", error);
           }
           break;
 
         default:
-          logger.warn("未知操作码:", packet.operation);
+          this.logger.warn("未知操作码:", packet.operation);
       }
     } catch (e) {
       if (e instanceof ParsePacketError) {
-        logger.warn("无法解析数据包", e);
+        this.logger.warn("无法解析数据包", e);
       } else {
-        logger.error("处理信息流失败", e);
+        this.logger.error("处理信息流失败", e);
       }
     }
   }
 
-  private async handleCommandPacket(
-    protocolVersion: number,
-    body: Buffer
-  ): Promise<void> {
+  private async handleCommandPacket(protocolVersion: number, body: Buffer): Promise<void> {
     try {
       if (protocolVersion === 2 || protocolVersion === 3) {
         // 普通包 (正文使用 zlib 压缩 或 使用 brotli 压缩的多个带文件头的普通包)
@@ -337,10 +336,10 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
         // 普通包,心跳及认证包 正文不使用压缩
         this.processCommandPacket(body);
       } else {
-        logger.error(`不支持的协议版本: ${protocolVersion}`);
+        this.logger.error(`不支持的协议版本: ${protocolVersion}`);
       }
     } catch (error) {
-      logger.error("处理命令包失败:", error);
+      this.logger.error("处理命令包失败:", error);
     }
   }
 
@@ -350,18 +349,13 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
         const messageStr = JSON.stringify(message);
         const bodyBuffer = Buffer.from(messageStr, "utf-8");
         const totalLength = 16 + bodyBuffer.length;
-        const header = this.createPacketHeader(
-          totalLength,
-          1,
-          5,
-          this.sequence++
-        );
+        const header = this.createPacketHeader(totalLength, 1, 5, this.sequence++);
         const packet = Buffer.concat([header, bodyBuffer]);
 
         this.websocketClient.send(packet);
         return true;
       } catch (error) {
-        logger.error("发送消息失败:", error);
+        this.logger.error("发送消息失败:", error);
         return false;
       }
     }
@@ -369,12 +363,7 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
   }
 
   // 创建数据包头部
-  private createPacketHeader(
-    totalLength: number,
-    protocolVersion: number,
-    operation: number,
-    sequence: number
-  ): Buffer {
+  private createPacketHeader(totalLength: number, protocolVersion: number, operation: number, sequence: number): Buffer {
     const buffer = Buffer.alloc(16);
 
     buffer.writeUInt32BE(totalLength, 0);
@@ -387,12 +376,7 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
   }
 
   // 创建认证包
-  private createAuthPacket(
-    roomId: number,
-    token: string,
-    uid: number = 0,
-    protover: number = 3
-  ): Buffer {
+  private createAuthPacket(roomId: number, token: string, uid: number = 0, protover: number = 3): Buffer {
     const authData: AuthPacketData = {
       uid,
       roomid: roomId,
@@ -452,7 +436,7 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
   private processCommandPacket(body: Buffer): void {
     try {
       const commandData: CommandData = JSON.parse(body.toString("utf-8"));
-      logger.debug("收到命令 -> ", commandData);
+      // this.logger.debug("收到命令 -> ", commandData);
       this.emit("PACKET_cmd", commandData);
 
       const cmd = commandData.cmd;
@@ -460,9 +444,7 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
         switch (cmd) {
           case "DANMU_MSG":
             this.emit(commandData.cmd, commandData);
-            logger.debug(
-              `收到弹幕消息: ${commandData.info?.[1]} (用户: ${commandData.info?.[2]?.[1]})`
-            );
+            this.logger.debug(`收到弹幕消息: ${commandData.info?.[1]} (用户: ${commandData.info?.[2]?.[1]})`);
             break;
           case "ONLINE_RANK_COUNT":
             this.emit(commandData.cmd, commandData);
@@ -474,11 +456,11 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
             this.emit(commandData.cmd, commandData);
             break;
           default:
-          // logger.warn("未知的 Command", cmd);
+          // this.logger.warn("未知的 Command", cmd);
         }
       }
     } catch (error) {
-      logger.error("无法解析命令:", error);
+      this.logger.error("无法解析命令:", error);
     }
   }
 
@@ -489,7 +471,7 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
     const protocolVersion = buffer.readUInt16BE(6);
     const operation = buffer.readUInt32BE(8);
 
-    // logger.debug(
+    // this.logger.debug(
     //   `BrotliCompressedPackets 数据包总大小: ${totalLength}, 头部大小: ${headerSize}, 协议: ${protocolVersion}, 类型: ${operation}`
     // );
 
@@ -498,16 +480,13 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
   }
 
   // 处理压缩数据
-  async handleCompressedData(
-    protocolVersion: number,
-    body: Buffer
-  ): Promise<void> {
+  async handleCompressedData(protocolVersion: number, body: Buffer): Promise<void> {
     return new Promise((resolve, reject) => {
       switch (protocolVersion) {
         case 2: // zlib压缩
           zlib.inflate(body, (err, decompressed) => {
             if (err) {
-              logger.error("zlib解压失败:", err);
+              this.logger.error("zlib解压失败:", err);
               reject(err);
             } else {
               this.processCommandPacket(decompressed);
@@ -525,10 +504,8 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
           break;
 
         default:
-          logger.error("不支持的协议版本:", protocolVersion);
-          reject(
-            new UnsupportedProtocolError(`不支持的协议版本: ${protocolVersion}`)
-          );
+          this.logger.error("不支持的协议版本:", protocolVersion);
+          reject(new UnsupportedProtocolError(`不支持的协议版本: ${protocolVersion}`));
       }
     });
   }
