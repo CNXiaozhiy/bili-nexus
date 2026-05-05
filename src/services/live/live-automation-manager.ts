@@ -332,6 +332,10 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
     logger.debug(`已创建 Hash -> RoomInfo 映射: ${hash} -> ${roomId}`);
 
+    this.roomIdToHashMap.set(roomId, hash);
+
+    logger.debug(`已创建 RoomId -> Hash 映射: ${roomId} -> ${hash}`);
+
     logger.info(`房间 ${roomId} 开始直播`);
 
     const isFirst = !this.firstFlagMap.has(roomId);
