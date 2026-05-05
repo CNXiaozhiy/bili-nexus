@@ -9,6 +9,7 @@ import UserAccount from "./core/bilibili/account";
 import { loginAccountByConsole } from "./core/bilibili/account-login";
 import QQBotService from "./services/qq-bot/qq-bot-service";
 import DynamicAutomationManager from "./services/dynamic/dynamic-automation-manager";
+import HttpApiSerivce from "./services/http-api/http-api-serivce";
 import { existsSync, mkdirSync } from "fs";
 
 const logger = getLogger("App");
@@ -31,6 +32,7 @@ else logger.error("无法识别当前工作环境，请检查环境NODE_ENV是�
 export class App {
   private liveAutomationManager: LiveAutomationManager | null = null;
   private dynamicAutomationManager: DynamicAutomationManager | null = null;
+  private httpApiSerivce: HttpApiSerivce | null = null;
 
   // 适配器
   private qqBotService: QQBotService | null = null;
@@ -165,6 +167,10 @@ export class App {
     this.dynamicAutomationManager.startMonitor();
 
     logger.debug("SpaceDynamicMonitor 初始化完成✔️");
+
+    // 初始化 HttpApiSerivce
+    this.httpApiSerivce = new HttpApiSerivce(this.liveAutomationManager, this.dynamicAutomationManager);
+    this.httpApiSerivce.init();
 
     return;
   }
