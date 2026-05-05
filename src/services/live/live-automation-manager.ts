@@ -72,6 +72,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
   > = new Map(); // Hash -> RoomInfo
 
   private firstFlagMap: Set<number> = new Set(); // roomId
+  private liveStatusMap: Map<number, boolean> = new Map(); // RoomId -> IsLive
 
   public liveMessageStreamClients: Map<number, LiveMessageStreamClient> = new Map(); // RoomId -> Client
   public liveRecorders: Map<string, LiveRecorder> = new Map(); // Hash -> LiveRecorder
@@ -261,6 +262,15 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
   private installLiveMessageStreamClientEventListeners(client: LiveMessageStreamClient, roomId: number, roomManageOptions: RoomManageOptions) {
     // Install listeners
     client.on("LIVE", async () => {
+      logger.debug(`房间 ${roomId} -> 触发 LIVE 事件`);
+
+      if (this.liveStatusMap.get(roomId) === true) {
+        logger.warn(`房间 ${roomId} -> 重复触发 LIVE 事件, 跳过处理`);
+        return;
+      }
+
+      this.liveStatusMap.set(roomId, true);
+
       const roomInfo = await this.biliAccount.getBiliApi().getLiveRoomInfo(roomId);
 
       if (roomInfo.live_status !== LiveRoomStatus.LIVE) {
@@ -276,6 +286,13 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
     client.on("PREPARING", async () => {
       logger.debug(`房间 ${roomId} -> 触发 PREPARING 事件`);
+
+      if (this.liveStatusMap.get(roomId) === false) {
+        logger.warn(`房间 ${roomId} -> 重复触发 PREPARING 事件, 跳过处理`);
+        return;
+      }
+
+      this.liveStatusMap.set(roomId, false);
 
       const hash = this.roomIdToHashMap.get(roomId);
       if (!hash) {
@@ -295,9 +312,11 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       .getLiveRoomInfo(roomId)
       .then((roomInfo) => {
         if (roomInfo.live_status === LiveRoomStatus.LIVE) {
+          this.liveStatusMap.set(roomId, true);
           this.handleLiveStart(BiliUtils.computeHash(roomId, new Date(roomInfo.live_time).getTime()), roomInfo, roomManageOptions);
         } else if (roomInfo.live_status === LiveRoomStatus.SLIDESHOW || roomInfo.live_status === LiveRoomStatus.END) {
           logger.debug(`WARN: 房间 ${roomId} -> 首次拉取状态为轮播/关播，不存在开播时的直播数据`);
+          this.liveStatusMap.set(roomId, false);
           this.handleLiveEnd({ hash: null, roomId, liveEndRoomInfo: roomInfo, roomManageOptions });
         } else {
           notifyEmitter.emit("msg-error", `${roomId} -> 直播状态未知, API: ${roomInfo.live_status}`);
