@@ -1244,7 +1244,7 @@ export default class QQBotService {
       if (Object.keys(notifyGroups).length === 0) {
         logger.debug(`直播间 ${roomId} 无群组订阅, 跳过通知`);
       } else {
-        const liveStatusMessages = await Utils.renderLiveEndTemplate(liveStartRoomInfo, liveEndRoomInfo, liveHash, liveDuration);
+        const liveStatusMessages = await Utils.renderLiveEndTemplate({ liveStartRoomInfo, liveEndRoomInfo, liveHash, liveDuration });
 
         Object.entries(notifyGroups).forEach(async ([gid, group]) => {
           if (!this.bot) {
@@ -1495,26 +1495,35 @@ class Utils {
     ];
   }
 
-  static async renderLiveEndTemplate(roomInfo: LiveRoomInfo, lastRoomInfo: LiveRoomInfo, liveHash: string, liveDuration: number) {
-    const upUserInfo = await BiliAccountService.getDefault().getBiliApi().getUserInfo(roomInfo.uid);
+  static async renderLiveEndTemplate({
+    liveStartRoomInfo,
+    liveEndRoomInfo,
+    liveHash,
+    liveDuration,
+  }: {
+    liveStartRoomInfo: LiveRoomInfo;
+    liveEndRoomInfo: LiveRoomInfo;
+    liveHash: string;
+    liveDuration: number;
+  }) {
+    const upUserInfo = await BiliAccountService.getDefault().getBiliApi().getUserInfo(liveEndRoomInfo.uid);
 
-    const liveTime = new Date(lastRoomInfo.live_time);
+    const liveTime = new Date(liveStartRoomInfo.live_time);
     const nowTiem = new Date();
 
     return [
-      OneBotMessageUtils.UrlImage(roomInfo.user_cover),
+      OneBotMessageUtils.UrlImage(liveEndRoomInfo.user_cover),
       OneBotMessageUtils.Text(
-        `【${upUserInfo.name}】${roomInfo.title}\n` +
-          `🆔 直播间ID: ${roomInfo.room_id}\n` +
-          `📝 直播间简介: ${roomInfo.description}\n` +
-          `📊 直播间状态: ${Utils.getLiveRoomStatusText(roomInfo.live_status)}\n` +
+        `【${upUserInfo.name}】${liveEndRoomInfo.title}\n` +
+          `🆔 直播间ID: ${liveEndRoomInfo.room_id}\n` +
+          `📝 直播间简介: ${liveEndRoomInfo.description}\n` +
+          `📊 直播间状态: ${Utils.getLiveRoomStatusText(liveEndRoomInfo.live_status)}\n` +
           `🎬 直播间场次: ${FormatUtils.formatDateWithSession(liveTime)}\n` +
-          `🔥 直播间人气: ${lastRoomInfo.online}\n` +
           `🔑 直播场哈希: ${liveHash.substring(0, 7)}\n` +
           `⏰ 开播时间: ${FormatUtils.formatDateTime(liveTime)}\n` +
           `🛑 关播时间: ${FormatUtils.formatDateTime(nowTiem)}\n` +
           `⏱️ 直播时长: ${FormatUtils.formatDurationDetailed(liveDuration)}\n\n` +
-          `https://live.bilibili.com/${roomInfo.room_id}`,
+          `https://live.bilibili.com/${liveEndRoomInfo.room_id}`,
       ),
     ];
   }
