@@ -215,7 +215,7 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
           this.logger.error("连接超时");
           this.disconnect();
         }
-      }, 10000);
+      }, 30000);
     } catch (error) {
       this.logger.error("初始化错误:", error);
       throw error;
@@ -232,6 +232,12 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
       this.websocketClient.close();
       this.websocketClient = null;
     }
+  }
+
+  public reconnect() {
+    this.logger.debug("开始重连⏳");
+    this.disconnect();
+    this.connect();
   }
 
   public destroy(): void {
@@ -260,8 +266,10 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
     });
 
     this.websocketClient.on("close", (code) => {
-      this.logger.warn(`与直播间 ${this.roomId} 的信息流连接已断开`);
-      this.disconnect();
+      this.logger.warn(`与直播间 ${this.roomId} 的信息流连接已断开, code: ${code}`);
+      this.logger.warn(`将在 5 秒后重连⏳...`);
+      setTimeout(() => this.reconnect(), 5000);
+
       this.emit("WS_close", code);
     });
 
