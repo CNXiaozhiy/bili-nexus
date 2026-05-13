@@ -176,7 +176,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
   }
 
   public addRoom(roomId: number, roomManageOptions: RoomManageOptions, manualPoll = true) {
-    logger.info(`添加房间 ${roomId}`);
+    logger.info(`添加房间 ${roomId} 成功 ✅`);
 
     if (this.rooms.has(roomId)) {
       logger.debug(`房间已添加, 添加失败`);

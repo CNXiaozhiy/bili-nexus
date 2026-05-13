@@ -1,7 +1,7 @@
 import XzQBot, { ReplyFunction, XzQBotError, XzQBotSendError } from "@/core/bot/xz-qbot";
 import { GroupMessageEvent, MessageEvent, Messages, OneBotMessageUtils, PrivateMessageEvent, SegmentMessage, SegmentMessages } from "@/types/one-bot";
 import { DynamicNewCardsMember, LiveRoomInfo, LiveRoomStatus } from "@/types/bilibili";
-import { QQBotError, QQBotServiceSetupError } from "@/types/errors/qq-bot";
+import { QQBotServiceSetupError } from "@/types/errors/qq-bot";
 import getLogger from "@/utils/logger";
 import LiveAutomationManager, { UploadEventOptions } from "../live/live-automation-manager";
 import DynamicAutomationManager from "../dynamic/dynamic-automation-manager";
@@ -9,7 +9,6 @@ import { appConfigManager, liveConfigManager, qqBotConfigManager, userDynamicCon
 import { DataStore } from "@/common/config";
 import notifyEmitter from "@/core/app/notify-emitter";
 import { loginAccount } from "@/core/bilibili/account-login";
-import type LiveMessageStreamClient from "@/core/bilibili/live/live-message-stream";
 import type LiveRecorder from "@/core/bilibili/live/live-recorder";
 import type VideoUploader from "@/core/bilibili/video/video-uploader";
 import CommandProcessor from "@/utils/command-processor";
@@ -1119,7 +1118,7 @@ export default class QQBotService {
 
   private installLiveAutomationManagerEventListeners() {
     this.liveAutomationManager.on("live-start", async ({ roomId, hash: liveHash, roomInfo, isFirst }) => {
-      logger.debug(`收到 liveAutomationManager 的事件 -> live-start, roomId: ${roomId}, liveHash: ${liveHash}, isFirst: ${isFirst}`);
+      logger.debug(`收到 liveAutomationManager 开始直播(live-start)🟢 事件 -> live-start, roomId: ${roomId}, liveHash: ${liveHash}, isFirst: ${isFirst}`);
 
       if (isFirst) {
         logger.info(`房间 ${roomId} 为首次直播状态通知，跳过QQ直播通知`);
@@ -1221,7 +1220,7 @@ export default class QQBotService {
     });
 
     this.liveAutomationManager.on("live-end", async ({ roomId, hash: liveHash, liveStartRoomInfo, liveEndRoomInfo, liveDuration, isFirst }) => {
-      logger.debug(`收到 liveMonitor 的事件 -> live-end, roomId: ${roomId}, liveHash: ${liveHash}, isFirst: ${isFirst}`);
+      logger.debug(`收到 liveAutomationManager 结束直播(live-end)🔴 事件, roomId: ${roomId}, liveHash: ${liveHash}, isFirst: ${isFirst}`);
 
       if (isFirst) {
         logger.info(`房间 ${roomId} 为首次直播状态通知，跳过QQ直播通知`);

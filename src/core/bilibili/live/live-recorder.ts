@@ -164,13 +164,13 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     this.recFfmpeg.once("start", () => {
       this.retryCount = 0;
       this.ffmpegRunning = true;
-      this.logger.debug("录制进程开始工作");
-      this.logger.info(`${this.hash} 分段[${this.getSegmentFilesCount() - 1}] -> 开始录制 ✅`);
+      this.logger.debug("录制进程即将开始工作 ⏳");
+      this.logger.info(`${this.hash.substring(0, 32)} -> 分段[${this.getSegmentFilesCount() - 1}] 即将开始录制 ⏳`);
       this.emit("start", isFirst);
     });
 
     this.recFfmpeg.on("progress", (stats: FfmpegStats) => {
-      if (!this.ffmpegStats) this.logger.debug("录制真正开始");
+      if (!this.ffmpegStats) this.logger.info("录制真正开始✅ 🔴REC");
       this.ffmpegStats = stats;
       this.emit("progress", stats);
     });
@@ -178,23 +178,23 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     this.recFfmpeg.once("exit", (code, signal) => {
       this.ffmpegRunning = false;
       this._setCurrentSegmentFileMateEndTime();
-      this.logger.info(`${this.hash} -> ffmpeg 退出 -> `, code);
+      this.logger.info(`${this.hash.substring(0, 32)} -> ffmpeg 退出 ❌, code:`, code);
       if (code == 0) return; // 交给 done 事件处理
     });
 
     this.recFfmpeg.once("err", (error: FfmpegError) => {
-      this.logger.error(`${this.hash} -> 录制失败 ❌`, error);
+      this.logger.error(`${this.hash.substring(0, 32)} -> 录制失败 ❌`, error);
       this.emit("err", error);
       this.recFfmpeg?.kill();
       setTimeout(() => {
-        this.logger.debug(`${this.hash} -> 收到事件 recFfmpeg.event.err -> 将在 5s 后尝试重试录制`);
+        this.logger.debug(`${this.hash.substring(0, 32)} -> 收到事件 recFfmpeg.event.err -> 将在 5s 后尝试重试录制`);
         this.checkDuration();
         this.retryRecord();
       }, 5000);
     });
 
     this.recFfmpeg.once("done", async (outputPath, stats) => {
-      this.logger.info(`${this.hash} -> ffmpeg 录制结束`);
+      this.logger.info(`${this.hash.substring(0, 32)} -> ffmpeg 录制结束🔴`);
       this.emit("end", this.getDuration());
     });
 
@@ -209,8 +209,8 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     this._checkIfDestroyed();
 
     if (this.retryTimeout) clearTimeout(this.retryTimeout);
-    this.logger.info(`${this.hash} -> stopRecord()`);
-    this.logger.debug(`${this.hash} -> 将设置(覆盖) stopTime, segmentMate`);
+    this.logger.info(`${this.hash.substring(0, 32)} -> stopRecord()`);
+    this.logger.debug(`${this.hash.substring(0, 32)} -> 将设置(覆盖) stopTime, segmentMate`);
     this.stopTime = Date.now();
 
     return await new Promise<{
@@ -244,8 +244,8 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
         let forceTimeout: NodeJS.Timeout | null = null;
 
         const stoped = () => {
-          this.logger.info(`${this.hash} -> Ffmpeg 进程已被 stopRecord() 关闭，录制已结束`);
-          this.logger.debug(`${this.hash} -> stopRecord() -> stoped() 录制已完成`);
+          this.logger.info(`${this.hash.substring(0, 32)} -> Ffmpeg 进程已被 stopRecord() 关闭，录制已结束`);
+          this.logger.debug(`${this.hash.substring(0, 32)} -> stopRecord() -> stoped() 录制已完成`);
           if (forceTimeout) clearTimeout(forceTimeout);
 
           _stop();
@@ -256,14 +256,14 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
         this.recFfmpeg?.stop();
 
         forceTimeout = setTimeout(() => {
-          this.logger.debug(`${this.hash} -> stopRecord() -> forceTimeout() , 原因: recFfmpeg.stop() 长时间未响应 -> 强制结束录制`);
+          this.logger.debug(`${this.hash.substring(0, 32)} -> stopRecord() -> forceTimeout() , 原因: recFfmpeg.stop() 长时间未响应 -> 强制结束录制`);
           forceTimeout = null;
           this.recFfmpeg?.removeAllListeners();
           this.recFfmpeg?.kill();
           stoped();
         }, 15000);
       } else {
-        this.logger.debug(`${this.hash} -> stopRecord() -> ffmpegRunning 为 false，录制已结束`);
+        this.logger.debug(`${this.hash.substring(0, 32)} -> stopRecord() -> ffmpegRunning 为 false，录制已结束`);
         _stop();
       }
     });
@@ -379,7 +379,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
   public retryRecord(force: boolean = false) {
     this._checkIfDestroyed();
 
-    this.logger.debug(`${this.hash} -> retryRecord(force: ${force})`);
+    this.logger.debug(`${this.hash.substring(0, 32)} -> retryRecord(force: ${force})`);
 
     if (force) {
       this.startRecord();
@@ -389,7 +389,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     if (this.retryCount > LiveRecorder.MAX_RETRY_COUNT) throw new LiveRecorderMaxRetriesError(this.hash);
 
     const delay = LiveRecorder.calculateRetryDelay(this.retryCount);
-    this.logger.debug(`${this.hash} -> retryRecord() -> 指数退避重试 -> 将在 ${delay}ms 后重试录制`);
+    this.logger.debug(`${this.hash.substring(0, 32)} -> retryRecord() -> 指数退避重试 -> 将在 ${delay}ms 后重试录制`);
     this.retryTimeout = setTimeout(() => {
       this.startRecord();
     }, delay);

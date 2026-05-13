@@ -27,7 +27,7 @@ export default class DynamicAutomationManager extends EventEmitter<DynamicAutoma
       return;
     }
 
-    logger.debug(`添加用户 ${mid}`);
+    logger.info(`添加用户 ${mid} 成功 ✅`);
     this.users.add(mid);
     logger.debug(`发射事件 new-user -> ${mid}`);
     this.emit("new-user", mid);
