@@ -3,7 +3,7 @@ import getLogger from "./utils/logger";
 import { initVersion, getVersion } from "./services/version";
 import Ffmpeg from "./core/ffmpeg";
 import { deleteFolderRecursive, isFolderEmpty } from "./utils/file";
-import LiveAutomationManager from "./services/live/live-automation-manager";
+import LiveAutomationManager, { RoomManageOptions } from "./services/live/live-automation-manager";
 import BiliAccountService from "./services/account/bili-account-service";
 import UserAccount from "./core/bilibili/account";
 import { loginAccountByConsole } from "./core/bilibili/account-login";
@@ -141,16 +141,23 @@ export class App {
     logger.info("开始初始化 LiveAutomationManager⏳");
 
     const rooms = liveConfigManager.get("rooms");
+    const _rooms: { roomId: number; roomManageOptions: RoomManageOptions }[] = [];
     for (const roomId in rooms) {
       if (!rooms[roomId].enable) {
         logger.info(`房间 ${roomId} 已禁用 ${rooms}`);
         continue;
       }
-      this.liveAutomationManager.addRoom(parseInt(roomId), {
-        autoRecord: rooms[roomId].autoRecord,
-        autoUpload: rooms[roomId].autoUpload,
+
+      _rooms.push({
+        roomId: parseInt(roomId),
+        roomManageOptions: {
+          autoRecord: rooms[roomId].autoRecord,
+          autoUpload: rooms[roomId].autoUpload,
+        },
       });
     }
+
+    this.liveAutomationManager.batchAddRooms(_rooms);
 
     logger.debug("LiveAutomationManager 初始化完成✔️");
 

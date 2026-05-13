@@ -175,7 +175,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     this.diskSpaceMonitor.startMonitor();
   }
 
-  public addRoom(roomId: number, roomManageOptions: RoomManageOptions) {
+  public addRoom(roomId: number, roomManageOptions: RoomManageOptions, manualPoll = true) {
     logger.info(`添加房间 ${roomId}`);
 
     if (this.rooms.has(roomId)) {
@@ -199,9 +199,14 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     logger.debug(`client.connect -> ${roomId}`);
     client.connect();
 
-    logger.info("进行首次拉取直播状态");
+    if (manualPoll) this.manualPoll(roomId);
+  }
 
-    this.firstPoolLiveRoomStatus(roomId, roomManageOptions);
+  public batchAddRooms(options: { roomId: number; roomManageOptions: RoomManageOptions }[]) {
+    options.forEach(({ roomId, roomManageOptions }) => this.addRoom(roomId, roomManageOptions, false));
+
+    logger.debug("批量添加房间完成，开始拉取数据");
+    this.manualPoll();
   }
 
   public removeRoom(roomId: number) {
@@ -313,31 +318,14 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     });
   }
 
-  private firstPoolLiveRoomStatus(roomId: number, roomManageOptions: RoomManageOptions) {
-    this.biliAccount
-      .getBiliApi()
-      .getLiveRoomInfo(roomId)
-      .then((roomInfo) => {
-        if (roomInfo.live_status === LiveRoomStatus.LIVE) {
-          this.liveStatusMap.set(roomId, true);
-          this.handleLiveStart(BiliUtils.computeHash(roomId, new Date(roomInfo.live_time).getTime()), roomInfo, roomManageOptions);
-        } else if (roomInfo.live_status === LiveRoomStatus.SLIDESHOW || roomInfo.live_status === LiveRoomStatus.END) {
-          logger.debug(`WARN: 房间 ${roomId} -> 首次拉取状态为轮播/关播，不存在开播时的直播数据`);
-          this.liveStatusMap.set(roomId, false);
-          this.handleLiveEnd({ hash: null, roomId, liveEndRoomInfo: roomInfo, roomManageOptions });
-        } else {
-          notifyEmitter.emit("msg-error", `${roomId} -> 直播状态未知, API: ${roomInfo.live_status}`);
-          logger.error(`${roomId} -> 直播状态未知, API: ${roomInfo.live_status}`);
-        }
-      });
-  }
+  private manualPoll(roomIds: number | number[] | null = null) {
+    const rooms = roomIds ? (Array.isArray(roomIds) ? roomIds : [roomIds]) : Array.from(this.rooms);
 
-  private manualPoll() {
-    if (this.rooms.size === 0) return;
+    if (rooms.length === 0) return;
 
     this.biliAccount
       .getBiliApi()
-      .batchGetLiveRoomInfo(Array.from(this.rooms))
+      .batchGetLiveRoomInfo(rooms)
       .then(({ by_room_ids: roomInfos }) => {
         for (const key in roomInfos) {
           const roomInfo = roomInfos[key];
@@ -345,7 +333,12 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
           if (roomInfo.live_status === LiveRoomStatus.LIVE) {
             if (this.liveStatusMap.get(roomId) === true) return; // 已经被 LiveMessageStream 通知过
-            logger.warn(`房间 ${roomId} -> LiveMessageStream 漏触发 LIVE 事件, 开始处理`);
+            if (!this.firstFlagMap.has(roomId)) {
+              logger.debug(`房间 ${roomId} -> 首次拉取(直播中)`);
+            } else {
+              logger.warn(`房间 ${roomId} -> LiveMessageStream 漏触发 LIVE 事件, 开始处理`);
+              notifyEmitter.emit("msg-warn", `[manualPoll]\n房间 ${roomId} -> LiveMessageStream 漏触发 LIVE 事件, 开始处理`);
+            }
             this.liveStatusMap.set(roomId, true);
 
             this.biliAccount
@@ -379,7 +372,12 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
               });
           } else if (roomInfo.live_status === LiveRoomStatus.SLIDESHOW || roomInfo.live_status === LiveRoomStatus.END) {
             if (this.liveStatusMap.get(roomId) === false) return; // 已经被 LiveMessageStream 通知过
-            logger.warn(`房间 ${roomId} -> LiveMessageStream 漏触发 PREPARING 事件, 开始处理`);
+            if (!this.firstFlagMap.has(roomId)) {
+              logger.debug(`WARN: 房间 ${roomId} -> 首次拉取(轮播/关播)，不存在开播时的直播数据`);
+            } else {
+              logger.warn(`房间 ${roomId} -> LiveMessageStream 漏触发 PREPARING 事件, 开始处理`);
+              notifyEmitter.emit("msg-warn", `[manualPoll]\n房间 ${roomId} -> LiveMessageStream 漏触发 PREPARING 事件, 开始处理`);
+            }
             this.liveStatusMap.set(roomId, false);
 
             this.biliAccount
