@@ -60,7 +60,7 @@ export default class LiveMonitor extends EventEmitter<LiveMonitorEvents> {
 
       if (!isFirstStatusChange) {
         if (roomInfo.live_status === LiveRoomStatus.LIVE) {
-          this.lastLiveHash = BiliUtils.computeHash(this.roomId, new Date(roomInfo.live_time).getTime());
+          this.lastLiveHash = BiliUtils.computeHash(this.roomId, new Date(roomInfo.live_time).getTime()).hash;
           this.emit("live-start", this.lastLiveHash, roomInfo);
         } else if (roomInfo.live_status === LiveRoomStatus.SLIDESHOW) {
           this.emit("live-slideshow", roomInfo);
@@ -70,7 +70,7 @@ export default class LiveMonitor extends EventEmitter<LiveMonitorEvents> {
               this.lastLiveHash!,
               roomInfo,
               this.lastRoomInfo ?? roomInfo,
-              this.lastRoomInfo ? Date.now() - new Date(this.lastRoomInfo.live_time).getTime() : 0
+              this.lastRoomInfo ? Date.now() - new Date(this.lastRoomInfo.live_time).getTime() : 0,
             );
           }
         } else if (roomInfo.live_status === LiveRoomStatus.END) {
@@ -79,7 +79,7 @@ export default class LiveMonitor extends EventEmitter<LiveMonitorEvents> {
             this.lastLiveHash!,
             roomInfo,
             this.lastRoomInfo ?? roomInfo,
-            this.lastRoomInfo ? Date.now() - new Date(this.lastRoomInfo.live_time).getTime() : 0
+            this.lastRoomInfo ? Date.now() - new Date(this.lastRoomInfo.live_time).getTime() : 0,
           );
           this.lastLiveHash = null;
         }
