@@ -62,6 +62,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
   private rooms = new Set<number>();
 
   private roomIdToHashMap: Map<number, string> = new Map();
+  private roomIdToRoomManageOptions: Map<number, RoomManageOptions> = new Map();
   private hashToRoomInfoMap: Map<
     string,
     {
@@ -88,6 +89,8 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
   // 录制超时计时器
   private recordTimeouts = new Map<string, NodeJS.Timeout>(); // Hash -> Timeout
 
+  private manualPollInterval: NodeJS.Timeout | null = null;
+
   private waitingForRestartRecordTask = new Set<string>(); // 直播Hash
 
   // 状态锁，防止并发清理
@@ -98,6 +101,9 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     super();
 
     this.initDiskSpaceMonitor();
+
+    this.manualPollInterval = setInterval(() => this.manualPoll(), 10000);
+    logger.info("混合拉取 -> 已安装 manualPoll 定时器");
   }
 
   public initDiskSpaceMonitor() {
@@ -178,6 +184,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     }
 
     this.rooms.add(roomId);
+    this.roomIdToRoomManageOptions.set(roomId, roomManageOptions);
 
     const client = new LiveMessageStreamClient(roomId, this.biliAccount);
 
@@ -322,6 +329,85 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
           notifyEmitter.emit("msg-error", `${roomId} -> 直播状态未知, API: ${roomInfo.live_status}`);
           logger.error(`${roomId} -> 直播状态未知, API: ${roomInfo.live_status}`);
         }
+      });
+  }
+
+  private manualPoll() {
+    if (this.rooms.size === 0) return;
+
+    this.biliAccount
+      .getBiliApi()
+      .batchGetLiveRoomInfo(Array.from(this.rooms))
+      .then(({ by_room_ids: roomInfos }) => {
+        for (const key in roomInfos) {
+          const roomInfo = roomInfos[key];
+          const roomId = roomInfo.room_id;
+
+          if (roomInfo.live_status === LiveRoomStatus.LIVE) {
+            if (this.liveStatusMap.get(roomId) === true) return; // 已经被 LiveMessageStream 通知过
+            logger.warn(`房间 ${roomId} -> LiveMessageStream 漏触发 LIVE 事件, 开始处理`);
+            this.liveStatusMap.set(roomId, true);
+
+            this.biliAccount
+              .getBiliApi()
+              .getLiveRoomInfo(roomId)
+              .then((roomInfo) => {
+                if (roomInfo.live_status !== LiveRoomStatus.LIVE) {
+                  logger.warn(
+                    `manualPoll -> 房间 ${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`,
+                  );
+                  notifyEmitter.emit(
+                    "msg-error",
+                    `[manualPoll]\n房间 ${roomId} -> manualPoll 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`,
+                  );
+                  return;
+                }
+
+                const roomManageOptions = this.roomIdToRoomManageOptions.get(roomId);
+
+                if (!roomManageOptions) {
+                  logger.error(`无法找到 RoomId -> RoomManageOptions 的映射 -> ${roomId}`);
+                  notifyEmitter.emit("msg-error", `[manualPoll]\n无法找到 ${roomId} -> RoomManageOptions 的映射, 触发直播通知流程中断`);
+                  return;
+                }
+
+                this.handleLiveStart(BiliUtils.computeHash(roomId, new Date(roomInfo.live_time).getTime()), roomInfo, roomManageOptions);
+              })
+              .catch((err) => {
+                logger.error(`房间 ${roomId} -> 获取直播信息失败 -> ${err}, 触发直播通知流程中断`);
+                notifyEmitter.emit("msg-error", `[manualPoll]\n房间 ${roomId} -> 获取直播信息失败 -> ${err}, 触发直播通知流程中断`);
+              });
+          } else if (roomInfo.live_status === LiveRoomStatus.SLIDESHOW || roomInfo.live_status === LiveRoomStatus.END) {
+            if (this.liveStatusMap.get(roomId) === false) return; // 已经被 LiveMessageStream 通知过
+            logger.warn(`房间 ${roomId} -> LiveMessageStream 漏触发 PREPARING 事件, 开始处理`);
+            this.liveStatusMap.set(roomId, false);
+
+            this.biliAccount
+              .getBiliApi()
+              .getLiveRoomInfo(roomId)
+              .then((roomInfo) => {
+                const roomManageOptions = this.roomIdToRoomManageOptions.get(roomId);
+
+                if (!roomManageOptions) {
+                  logger.error(`无法找到 RoomId -> RoomManageOptions 的映射 -> ${roomId}, 触发直播结束通知流程中断`);
+                  notifyEmitter.emit("msg-error", `[manualPoll]\n无法找到 ${roomId} -> RoomManageOptions 的映射, 触发直播结束通知流程中断`);
+                  return;
+                }
+
+                this.handleLiveEnd({ hash: null, roomId, liveEndRoomInfo: roomInfo, roomManageOptions });
+              })
+              .catch((err) => {
+                logger.error(`房间 ${roomId} -> 获取直播信息失败 -> ${err}, 触发直播结束通知流程中断`);
+                notifyEmitter.emit("msg-error", `[manualPoll]\n房间 ${roomId} -> 获取直播信息失败 -> ${err}, 触发直播结束通知流程中断`);
+              });
+          } else {
+            notifyEmitter.emit("msg-error", `[manualPoll]\n房间 ${roomId} -> 直播状态未知, API: ${roomInfo.live_status}`);
+            logger.error(`${roomId} -> 直播状态未知, API: ${roomInfo.live_status}`);
+          }
+        }
+      })
+      .catch((err) => {
+        logger.warn(`manualPoll -> 获取直播信息失败 -> ${err}`);
       });
   }
 
