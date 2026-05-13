@@ -386,6 +386,17 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
               .getBiliApi()
               .getLiveRoomInfo(roomId)
               .then((roomInfo) => {
+                if (roomInfo.live_status === LiveRoomStatus.LIVE) {
+                  logger.warn(
+                    `manualPoll -> 房间 ${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`,
+                  );
+                  notifyEmitter.emit(
+                    "msg-error",
+                    `[manualPoll]\n房间 ${roomId} -> manualPoll 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`,
+                  );
+                  return;
+                }
+
                 const roomManageOptions = this.roomIdToRoomManageOptions.get(roomId);
 
                 if (!roomManageOptions) {
