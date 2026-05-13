@@ -14,8 +14,8 @@ export interface DynamicAutomationManagerEvents {
 export default class DynamicAutomationManager extends EventEmitter<DynamicAutomationManagerEvents> {
   private users = new Set<string>();
   private isRunning = false;
-  private startMonitorTime = 0; // s
-  private latestDynamicMap = new Map<string, number>(); // uid -> timestamp
+
+  private latestDynamicPostTime = 0;
 
   constructor(private readonly biliAccount: BiliAccount) {
     super();
@@ -51,11 +51,9 @@ export default class DynamicAutomationManager extends EventEmitter<DynamicAutoma
       return;
     }
 
-    this.startMonitorTime = Math.floor(Date.now() / 1000);
     this.isRunning = true;
     this.pool();
 
-    logger.debug("this.startMonitorTime ->", this.startMonitorTime);
     logger.info(`动态监控自动化已启动 ✅`);
   }
 
@@ -75,6 +73,26 @@ export default class DynamicAutomationManager extends EventEmitter<DynamicAutoma
           logger.info(`检测到 ${data.new_num} 条新动态`);
         }
 
+        if (data.cards.length === 0) {
+          return;
+        }
+
+        // const cards = data.cards.sort((a, b) => b.desc.timestamp - a.desc.timestamp);
+        const cards = data.cards;
+
+        if (!this.latestDynamicPostTime) {
+          this.latestDynamicPostTime = cards[0].desc.timestamp;
+          logger.info(`最新动态时间 -> ${this.latestDynamicPostTime}`);
+          return;
+        }
+
+        const _latestDynamicPostTime = cards[0].desc.timestamp;
+
+        if (_latestDynamicPostTime <= this.latestDynamicPostTime) {
+          // 动态没变化，或上次的最新动态被删除
+          return;
+        }
+
         for (let i = 0; i < data.cards.length; i++) {
           const card = data.cards[i];
 
@@ -82,22 +100,44 @@ export default class DynamicAutomationManager extends EventEmitter<DynamicAutoma
           const dynamicId = card.desc.dynamic_id;
           const timestamp = card.desc.timestamp;
 
-          if (timestamp < this.startMonitorTime) {
-            continue;
-          }
-
           if (!this.users.has(uid)) {
             continue;
           }
 
-          if (!this.latestDynamicMap.has(uid) || this.latestDynamicMap.get(uid)! < timestamp) {
-            this.latestDynamicMap.set(uid, timestamp);
-
+          if (timestamp > this.latestDynamicPostTime) {
             logger.info(`检测到用户 ${uid} 发布了新动态 ->`, dynamicId);
             logger.debug(`发射事件 new-dynamic -> ${uid} -> ${dynamicId}`);
             this.emit("new-dynamic", uid, dynamicId, card);
+          } else {
+            break;
           }
         }
+
+        this.latestDynamicPostTime = _latestDynamicPostTime;
+
+        // for (let i = 0; i < data.cards.length; i++) {
+        //   const card = data.cards[i];
+
+        //   const uid = card.desc.uid.toString();
+        //   const dynamicId = card.desc.dynamic_id;
+        //   const timestamp = card.desc.timestamp;
+
+        //   if (timestamp < this.startMonitorTime) {
+        //     continue;
+        //   }
+
+        //   if (!this.users.has(uid)) {
+        //     continue;
+        //   }
+
+        //   if (!this.latestDynamicMap.has(uid) || this.latestDynamicMap.get(uid)! < timestamp) {
+        //     this.latestDynamicMap.set(uid, timestamp);
+
+        //     logger.info(`检测到用户 ${uid} 发布了新动态 ->`, dynamicId);
+        //     logger.debug(`发射事件 new-dynamic -> ${uid} -> ${dynamicId}`);
+        //     this.emit("new-dynamic", uid, dynamicId, card);
+        //   }
+        // }
 
         // 递归pool
         if (this.isRunning) {
