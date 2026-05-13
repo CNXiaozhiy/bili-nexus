@@ -291,9 +291,9 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
         return;
       }
 
-      const hash = BiliUtils.computeHash(roomId, new Date(roomInfo.live_time).getTime());
+      const hashs = BiliUtils.computeHash(roomId, new Date(roomInfo.live_time).getTime());
 
-      this.handleLiveStart(hash, roomInfo, roomManageOptions);
+      this.handleLiveStart(hashs, roomInfo, roomManageOptions);
     });
 
     client.on("PREPARING", async () => {
@@ -420,7 +420,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       });
   }
 
-  private async handleLiveStart(hash: string, roomInfo: LiveRoomInfo, roomManageOptions: RoomManageOptions) {
+  private async handleLiveStart({ hash, sessionHash }: { hash: string; sessionHash: string }, roomInfo: LiveRoomInfo, roomManageOptions: RoomManageOptions) {
     const roomId = roomInfo.room_id;
 
     this.hashToRoomInfoMap.set(hash, { roomId, liveStartRoomInfo: roomInfo, liveStartTime: new Date(roomInfo.live_time).getTime() });
@@ -450,7 +450,8 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
       const inputUrls = await this.biliAccount.getBiliApi().getLiveStreamUrl(roomId);
       const inputUrl = inputUrls[0];
-      const recorder = new LiveRecorder(hash, inputUrl, appConfigManager.get("recordingDir"));
+      const recordingDir = appConfigManager.get("recordingDir");
+      const recorder = new LiveRecorder({ hash, sessionHash, inputUrl, recordingDir });
 
       // Install Listeners
       recorder.on("start", (isFirst) => {

@@ -33,6 +33,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
   private inputUrl: string;
   private recordingDir: string;
   public hash: string; // 每一次直播的唯一标识
+  public sessionHash: string;
 
   private recFfmpeg: RecordFfmpeg | null = null;
   private ffmpegRunning: boolean = false;
@@ -59,12 +60,13 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     return this.ffmpegRunning;
   }
 
-  constructor(hash: string, inputUrl: string, recordingDir: string) {
+  constructor(options: { hash: string; sessionHash: string; inputUrl: string; recordingDir: string }) {
     super();
-    this.logger = getLogger("LiveRecorder." + hash.substring(0, 7));
-    this.hash = hash;
-    this.inputUrl = inputUrl;
-    this.recordingDir = path.resolve(recordingDir);
+    this.logger = getLogger("LiveRecorder." + options.hash.substring(0, 7));
+    this.hash = options.hash;
+    this.sessionHash = options.sessionHash;
+    this.inputUrl = options.inputUrl;
+    this.recordingDir = path.resolve(options.recordingDir);
   }
 
   // 低于 60s 的录制会被忽略，duration 为 ms
@@ -289,7 +291,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     return await new Promise((resolve, reject) => {
       this.logger.info("开始合并分段", resp.segmentFiles);
 
-      const concatFfmpeg = Ffmpeg.createConcatCommand(resp.segmentFiles, this.generateNewFilePath("merge"));
+      const concatFfmpeg = Ffmpeg.createConcatCommand(resp.segmentFiles, this.generateNewFilePath("merge", resp.startTime));
 
       concatFfmpeg.once("start", () => {
         this.logger.info(`concatFfmpeg 开始合并任务`);
@@ -365,10 +367,10 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     return Array.from(this.segmentFiles).map(([filePath]) => filePath);
   }
 
-  public generateNewFilePath(index: number | string) {
+  public generateNewFilePath(index: number | string, timestamp = Date.now()) {
     this._checkIfDestroyed();
 
-    return `${this.recordingDir}/${this.hash}_${index}.flv`;
+    return `${this.recordingDir}/${timestamp}-${this.sessionHash.substring(0, 16)}-${this.hash.substring(0, 32)}_${index}.flv`;
   }
 
   /**

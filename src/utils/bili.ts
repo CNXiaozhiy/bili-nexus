@@ -1,11 +1,15 @@
 import { LiveRoomStatus, VipType } from "@/types/bilibili";
 import Crypto from "crypto";
+import FormatUtils from "./format";
 
 export default class BiliUtils {
   static computeHash(roomId: number, startTime: number) {
-    return Crypto.createHash("sha256")
-      .update(`${roomId}-${startTime}`)
-      .digest("hex");
+    const session = FormatUtils.formatDateWithSession(new Date(startTime));
+
+    return {
+      hash: Crypto.createHash("sha256").update(`${roomId}-${startTime}`).digest("hex"),
+      sessionHash: Crypto.createHash("sha256").update(session).digest("hex"),
+    };
   }
   static transformLiveStatus(status: LiveRoomStatus) {
     switch (status) {
