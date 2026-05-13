@@ -444,7 +444,7 @@ export default class LiveMessageStreamClient extends EventEmitter<LiveMessageStr
         switch (cmd) {
           case "DANMU_MSG":
             this.emit(commandData.cmd, commandData);
-            this.logger.debug(`收到弹幕消息: ${commandData.info?.[1]} (用户: ${commandData.info?.[2]?.[1]})`);
+            // this.logger.debug(`收到弹幕消息: ${commandData.info?.[1]} (用户: ${commandData.info?.[2]?.[1]})`);
             break;
           case "ONLINE_RANK_COUNT":
             this.emit(commandData.cmd, commandData);
