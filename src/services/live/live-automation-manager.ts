@@ -17,6 +17,7 @@ import { BiliAccount } from "@/core/bilibili/bili-account";
 const logger = getLogger("LiveAutomationManager");
 
 const MAX_RECORD_TIMEOUT = 8 * 60 * 60 * 1000;
+const MANUAL_POOL_INTERVAL = 60 * 1000;
 
 export class CustomBiliAccountNotFound extends Error {}
 
@@ -102,7 +103,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
     this.initDiskSpaceMonitor();
 
-    this.manualPollInterval = setInterval(() => this.manualPoll(), 10000);
+    this.manualPollInterval = setInterval(() => this.manualPoll(), MANUAL_POOL_INTERVAL);
     logger.info("混合拉取 -> 已安装 manualPoll 定时器");
   }
 
