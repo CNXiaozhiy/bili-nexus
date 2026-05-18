@@ -35,6 +35,9 @@ export default class QQBotService {
   private groupCommandProcessor = new CommandProcessor<ProcessorContext<GroupMessageEvent>, Messages | null>();
   private privateCommandProcessor = new CommandProcessor<ProcessorContext<PrivateMessageEvent>, Messages | null>();
 
+  private Debug_SubscribeFree = false;
+  private Debug_SubscribeFree_Interval: NodeJS.Timeout | null = null;
+
   constructor(
     private readonly liveAutomationManager: LiveAutomationManager,
     private readonly dynamicAutomationManager: DynamicAutomationManager,
@@ -518,6 +521,20 @@ export default class QQBotService {
       }
 
       return null;
+    });
+
+    this.commandProcessor.register(".bn.sf", async (args, context) => {
+      if (!Utils.auth(context.event.user_id, 10)) throw new AuthError("权限不足");
+      this.Debug_SubscribeFree = true;
+      this.Debug_SubscribeFree_Interval = setInterval(() => {
+        if (this.liveAutomationManager.getLiveRecorders().size === 0) {
+          this.Debug_SubscribeFree = false;
+          this.Debug_SubscribeFree_Interval?.close();
+          context.reply("BN-Subscribe-Free 状态空闲");
+        }
+      }, 10 * 1000);
+      logger.debug("BN-Subscribe-Free 已启用");
+      return "BN-Subscribe-Free 已启用";
     });
 
     this.commandProcessor.register(".bn", async (args, context) => {
