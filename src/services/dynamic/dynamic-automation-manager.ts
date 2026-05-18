@@ -138,16 +138,14 @@ export default class DynamicAutomationManager extends EventEmitter<DynamicAutoma
         //     this.emit("new-dynamic", uid, dynamicId, card);
         //   }
         // }
-
-        // 递归pool
-        if (this.isRunning) {
-          setTimeout(() => this.pool(), 3000);
-        }
       })
       .catch((error) => {
         logger.error(`获取动态失败: ${error}`);
+      })
+      .finally(() => {
+        // 递归pool
         if (this.isRunning) {
-          setTimeout(() => this.pool(), 5000);
+          setTimeout(() => this.pool(), 3000);
         }
       });
   }
