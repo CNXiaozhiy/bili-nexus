@@ -1637,7 +1637,7 @@ class SubscriptionQuery<T extends DataStore<string>> {
     }
 
     const officialResource = this.getOfficialResource(groupId);
-    if (officialResource) subscriptions.push(officialResource.toString());
+    if (officialResource && !subscriptions.includes(officialResource.toString())) subscriptions.push(officialResource.toString());
 
     return subscriptions;
   }
