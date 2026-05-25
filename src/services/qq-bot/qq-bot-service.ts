@@ -1362,8 +1362,8 @@ export default class QQBotService {
             logger.warn("通知用户组检查 -> 即将更新配置文件");
 
             userConfig.group[gid].users = availableGroupUserArr;
-            qqBotConfigManager.set("liveRoom", usersDynamicConfig);
-            logger.info(`通知用户组检查 -> 已设置 ${gid} 的最新配置✅`);
+            qqBotConfigManager.set("userDynamic", usersDynamicConfig);
+            logger.info(`通知用户组检查 -> 已设置 ${gid} 的最新动态配置✅`);
           } else {
             logger.info("通知用户组检查 -> 检测通过，均为存在用户✅");
           }
