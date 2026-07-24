@@ -461,7 +461,9 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
           });
         }
       })
-      .catch(this.logger.error);
+      .catch((error) => {
+        this.logger.error("停止录制失败:", error);
+      });
 
     this.removeAllListeners();
 
