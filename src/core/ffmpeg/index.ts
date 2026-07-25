@@ -469,6 +469,8 @@ export default class Ffmpeg {
       }
     }
 
+    args.push("-tls_verify", "0");
+
     args.push("-i", inputUrl);
     args.push(
       "-c:v",
