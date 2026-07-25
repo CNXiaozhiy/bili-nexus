@@ -741,6 +741,153 @@ export interface LiveRoomBaseInfoResp {
   by_room_ids: Record<string, LiveRoomBaseInfo>;
 }
 
+export enum XcodeState {
+  NOT_STARTED = 0,
+  PROCESSING = 1,
+  SUCCESS = 2,
+  FAILED = 3,
+}
+
+/**
+state字段值(稿件状态)
+值	内容	备注
+1	橙色通过	
+0	开放浏览	
+-1	待审	
+-2	被打回	
+-3	网警锁定	
+-4	被锁定	视频撞车了
+-5	管理员锁定	
+-6	修复待审	
+-7	暂缓审核	
+-8	补档待审	
+-9	等待转码	
+-10	延迟审核	
+-11	视频源待修	
+-12	转储失败	
+-13	允许评论待审	
+-14	临时回收站	
+-15	分发中	
+-16	转码失败	
+-20	创建未提交	
+-30	创建已提交	
+-40	定时发布	
+-100	用户删除	
+ */
+
+export enum AuditState {
+  ORANGE = 1, // 橙色通过
+  OPEN = 0, // 开放浏览
+  PENDING = -1, // 待审
+  REJECT = -2, // 被打回
+  POLICE_LOCK = -3, // 网警锁定
+  COLLISION_LOCK = -4, // 被锁定（视频撞车了）
+  ADMIN_LOCK = -5, // 管理员锁定
+  REPAIR_PENDING = -6, // 修复待审
+  DEFER = -7, // 暂缓审核
+  ARCHIVE_PENDING = -8, // 补档待审
+  TRANSCODING = -9, // 等待转码
+  DELAY = -10, // 延迟审核
+  SOURCE_REPAIR = -11, // 视频源待修
+  DUMP_FAIL = -12, // 转储失败
+  COMMENT_REVIEW = -13, // 允许评论待审
+  RECYCLE = -14, // 临时回收站
+  DISTRIBUTING = -15, // 分发中
+  TRANSCODE_FAIL = -16, // 转码失败
+  DRAFT = -20, // 创建未提交
+  SUBMITTED = -30, // 创建已提交
+  SCHEDULED = -40, // 定时发布
+  DELETED = -100, // 用户删除
+
+  UNKNOWN_60 = -60,
+}
+
+export enum AuditAegisState {
+  NOT_STARTED = 0,
+  PROCESSING = 1,
+  FINISHED = 2,
+  REJECT = 3,
+  LOCKED = 4,
+  LIMITED = 5,
+}
+
+export enum OpenState {
+  NOT_OPEN = 0,
+  MANUAL_OPEN = 1,
+  TIMED_OPEN = 2,
+  OPENED = 3,
+  LOW_DEF_COMPLETE = 4,
+  TREE_AUDITING = 5,
+}
+
+export interface VideoDetailXcode {
+  cid: number;
+  xcode_tip: string; // 转码提示
+  fail_tip: string; // 失败提示
+  xcode_state: XcodeState;
+  transcode_list: {
+    resolution: string; // "360P 流畅" || "480P 标清"
+    status: "success" | "processing" | "failed"; // "failed" 属于猜测，并未出现在逆向代码中
+    estimated_time: number;
+    completed_at: number;
+    start_time: number;
+    time_now: number;
+    failure_reason: string;
+  }[];
+  xcode_begin_at: number; // 转码开始时间
+  max_estimate_time: number; // 最大预估时间
+  max_estimate_end_at: number; // 最大预估结束时间
+}
+
+export interface VideoDetailAudit {
+  aid: number;
+  state: AuditState;
+  aegis_state: AuditAegisState;
+  audit_process: null;
+  political_editable: number;
+  political_media: number;
+  is_interactive: number;
+  appeal: {
+    open_apid: number;
+    reject: string;
+    jump_url: string;
+  };
+  problem_detail: {
+    type: "archive";
+    reject_reason: string; //"您的视频涉及低俗文字声音"
+    reject_reason_url: string; // "https://member.bilibili.com/platform/convention/content?index=2-3-2\u0026navhide=1"
+    modify_advise: string; // 建议 "建议对涉及易与性行为产生联想的描述、性行为性器官的暗示指代、模拟性行为声音等的片段内容（包括但不限于画面、素材、文字、音声等）进行遮挡、打码等修改，或删除该片段。"
+    problem_description: string; // "bilibili会对判断为低俗导向的内容，根据违规程度进行删除下线、限制内容传播的处理，包括但不限于以下场景： 以文字、音声等方式暗示性行为，或通过语言表达暗示性器官/性行为。 ① 内容中涉及娇喘喘息、舔耳、呼气类音声。 ② 内容中涉及粘稠口腔音，形式包括但不限于口水音、弹射音、亲吻音、吮吸音等通过舌部蠕动/嘴唇吸吮/唾液拉丝所发出的黏腻声音。 ③ 使用低俗道具，如芦荟胶/润滑液搓手涂麦，使用足部/胸部/低俗手势搓麦、舔舐棒棒糖/果冻/冰淇淋发音等易引发低俗互动的ASMR。 ④ 内容涉及与性交强关联的声音。 ⑤ 涉及性行为、生殖器的粗俗表述。 ⑥ 音频音效、文字文案等涉及暗示或易产生低俗联想，如舔耳音、文爱（使用文字描述或暗示性行为）等。"
+    problem_description_title: string; // 低俗内容
+    reject_reason_id: number; //
+    picture_data: [];
+    reject_video_explain: {
+      title: string;
+      link: {
+        web: string;
+        app: string;
+      };
+    };
+    index: number; // 视频 index
+    violation_time: string; // "P1(00:00:02-04:23:23)"
+    violation_position: string; // "口播"
+  }[];
+  limited_open: number;
+  app_appeal_url: string;
+  app_appeal_state: number;
+  state_panel: number;
+  is_owner: boolean;
+}
+
+export interface VideoDetailArchive {
+  aid: number;
+  open_state: OpenState;
+  pubtime: number; // 发布时间
+  dtime: number; // 定时发布时间
+  is_fast_open: boolean; // 是否是快速开放
+  issue_content: string; // 问题描述
+}
+
 export interface VideoInfo {
   bvid: string;
   aid: string;

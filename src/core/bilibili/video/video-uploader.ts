@@ -5,6 +5,7 @@ import getLogger from "@/utils/logger";
 import EventEmitter from "events";
 import BiliApi from "@/core/bilibili/bili-api";
 import { BiliAccount } from "@/core/bilibili/bili-account";
+import VideoTracker from "./video-tracker";
 
 export interface VideoInfo {
   title: string;
@@ -42,6 +43,7 @@ export interface Task {
 }
 
 interface DoneResponse {
+  tracker: VideoTracker;
   bizIds: number[];
   tasks: Task[][];
   aid: number;
@@ -383,6 +385,7 @@ export default class VideoUploader extends EventEmitter<{
       this.duration = Date.now() - startTime;
 
       const res = {
+        tracker: new VideoTracker(this.name + "." + resp.bvid, this.biliAccount, resp.bvid),
         warnings,
         ...resp,
         bizIds,

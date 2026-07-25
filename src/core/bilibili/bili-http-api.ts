@@ -13,6 +13,9 @@ import {
   DanmuInfo,
   DynamicNew,
   LiveRoomBaseInfoResp,
+  VideoDetailXcode,
+  VideoDetailAudit,
+  VideoDetailArchive,
 } from "@/types/bilibili";
 import { Response } from "@/types/bilibili/bili-http-api";
 import { BiliHttpApiError } from "@/types/errors/bili-api";
@@ -45,7 +48,9 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
    * @returns
    */
   async generateLoginQrcode() {
-    const resp = await request.get<Response<{ url: string; qrcode_key: string }>>("https://passport.bilibili.com/x/passport-login/web/qrcode/generate");
+    const resp = await request.get<Response<{ url: string; qrcode_key: string }>>(
+      "https://passport.bilibili.com/x/passport-login/web/qrcode/generate"
+    );
 
     checkResponseCode(resp.data);
 
@@ -119,7 +124,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       },
       { name: "RSA-OAEP", hash: "SHA-256" },
       true,
-      ["encrypt"],
+      ["encrypt"]
     );
 
     async function getCorrespondPath(timestamp: number) {
@@ -152,7 +157,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
         headers: {
           cookie: this.getCookie(),
         },
-      },
+      }
     );
 
     if (resp.data.code === -101) {
@@ -199,7 +204,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
     const params = roomIds.map((roomId) => `room_ids=${roomId}`).join("&");
     const resp = await request.get<Response<LiveRoomBaseInfoResp>>(
       `https://api.live.bilibili.com/xlive/web-room/v1/index/getRoomBaseInfo?req_biz=web_room_componet&${params}`,
-      {},
+      {}
     );
 
     checkResponseCode(resp.data);
@@ -229,13 +234,13 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
         {
           room_id: roomId,
         },
-        await this.getAccountInfo(),
+        await this.getAccountInfo()
       )}`,
       {
         headers: {
           cookie: this.getCookie(),
         },
-      },
+      }
     );
 
     checkResponseCode(resp.data);
@@ -250,7 +255,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
         headers: {
           cookie: this.getCookie(),
         },
-      },
+      }
     );
 
     checkResponseCode(resp.data);
@@ -266,7 +271,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
         headers: {
           Referer: "https://live.bilibili.com/",
         },
-      },
+      }
     );
 
     checkResponseCode(resp.data);
@@ -364,7 +369,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       `https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id=${dynamicId}`,
       {
         headers: { cookie: this.getCookie() },
-      },
+      }
     );
 
     checkResponseCode(resp.data);
@@ -383,6 +388,67 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
   }
 
   // 投稿类
+
+  async getVideos(bvid: string) {
+    const resp = await request.get<
+      Response<{
+        page: {
+          total: number;
+          pn: number;
+          ps: number;
+        };
+        videos: {
+          cid: number;
+          index: number;
+          xcode_state: number;
+        }[];
+      }>
+    >(`https://member.bilibili.com/x/web/detail/videos?mode=1&ps=500&pn=1&bvid=${bvid}`, {
+      headers: {
+        cookie: this.getCookie(),
+      },
+    });
+
+    checkResponseCode(resp.data);
+
+    return resp.data.data;
+  }
+
+  async getVideoDetailXcode(bvid: string, cid: number) {
+    const resp = await request.get<Response<VideoDetailXcode>>(`https://member.bilibili.com/x/web/detail/xcode?bvid=${bvid}&cid=${cid}`, {
+      headers: {
+        cookie: this.getCookie(),
+      },
+    });
+
+    checkResponseCode(resp.data);
+
+    return resp.data.data;
+  }
+
+  async getVideoDetailAudit(bvid: string) {
+    const resp = await request.get<Response<VideoDetailAudit>>(`https://member.bilibili.com/x/web/detail/audit?bvid=${bvid}`, {
+      headers: {
+        cookie: this.getCookie(),
+      },
+    });
+
+    checkResponseCode(resp.data);
+
+    return resp.data.data;
+  }
+
+  async getVideoDetailArchive(bvid: string) {
+    const resp = await request.get<Response<VideoDetailArchive>>(`https://member.bilibili.com/x/web/detail/archive?bvid=${bvid}`, {
+      headers: {
+        cookie: this.getCookie(),
+      },
+    });
+
+    checkResponseCode(resp.data);
+
+    return resp.data.data;
+  }
 
   async preuploadVideo(options: { fileName: string; fileSize: number }) {
     const resp = await request.get<{
@@ -407,7 +473,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
           Referer: "https://member.bilibili.com/platform/upload/video/frame",
           cookie: this.getCookie(),
         },
-      },
+      }
     );
 
     if (resp.data.OK !== 1) throw new UploadVideoError("获取上传元数据失败");
@@ -421,15 +487,18 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       bucket: string;
       key: string;
       upload_id: string;
-    }>(`${options.uploadUrl}?uploads&output=json&profile=ugcfx%2Fbup&filesize=${options.fileSize}&partsize=${options.partSize}&biz_id=${options.bizId}`, {
-      method: "POST",
-      headers: {
-        Origin: "https://member.bilibili.com",
-        Referer: "https://member.bilibili.com/",
-        "X-Upos-Auth": options.auth,
-        cookie: this.getCookie(),
-      },
-    });
+    }>(
+      `${options.uploadUrl}?uploads&output=json&profile=ugcfx%2Fbup&filesize=${options.fileSize}&partsize=${options.partSize}&biz_id=${options.bizId}`,
+      {
+        method: "POST",
+        headers: {
+          Origin: "https://member.bilibili.com",
+          Referer: "https://member.bilibili.com/",
+          "X-Upos-Auth": options.auth,
+          cookie: this.getCookie(),
+        },
+      }
+    );
 
     if (resp.data.OK !== 1) throw new UploadVideoError("获取上传 ID 失败");
     return resp.data;
@@ -535,7 +604,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
             start,
             end: end - 1,
             highWaterMark: 64 * 1024,
-          }),
+          })
       );
 
       return resp.data;
@@ -567,7 +636,14 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
     return resp.data.data;
   }
 
-  async getRecommendTags(options: { upload_id?: string; subtype_id?: string; title?: string; filename?: string; description?: string; cover_url?: string }) {
+  async getRecommendTags(options: {
+    upload_id?: string;
+    subtype_id?: string;
+    title?: string;
+    filename?: string;
+    description?: string;
+    cover_url?: string;
+  }) {
     const params = new URLSearchParams(options);
     const resp = await request.get<Response<{ tag: string; checked: number; request_id: string }[]>>(
       `https://member.bilibili.com/x/vupre/web/tag/recommend?${params.toString()}`,
@@ -575,7 +651,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
         headers: {
           cookie: this.getCookie(),
         },
-      },
+      }
     );
 
     checkResponseCode(resp.data);
@@ -601,7 +677,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
         cover: options.cover || "https://s1.hdslb.com/bfs/templar/york-static/viedeo_material_default.png",
         season_price: 0,
         csrf,
-      },
+      }
     );
 
     if (resp.data.code !== 0) new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
@@ -628,7 +704,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       {
         episodes: options.episodes,
         sectionId: options.sectionId,
-      },
+      }
     );
 
     if (resp.data.code !== 0) new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
@@ -753,8 +829,8 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
 
 function encWbi(params: Record<string, any>, loginInfo: LoginInfo) {
   const mixinKeyEncTab = [
-    46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49, 33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40, 61,
-    26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52,
+    46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49, 33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55,
+    40, 61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52,
   ];
 
   // 对 imgKey 和 subKey 进行字符顺序打乱编码

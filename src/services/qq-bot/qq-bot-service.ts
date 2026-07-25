@@ -1,6 +1,6 @@
 import XzQBot, { ReplyFunction, XzQBotError, XzQBotSendError } from "@/core/bot/xz-qbot";
 import { GroupMessageEvent, MessageEvent, Messages, OneBotMessageUtils, PrivateMessageEvent, SegmentMessage, SegmentMessages } from "@/types/one-bot";
-import { DynamicNewCardsMember, LiveRoomInfo, LiveRoomStatus } from "@/types/bilibili";
+import { AuditAegisState, AuditState, DynamicNewCardsMember, LiveRoomInfo, LiveRoomStatus } from "@/types/bilibili";
 import { QQBotServiceSetupError } from "@/types/errors/qq-bot";
 import getLogger from "@/utils/logger";
 import LiveAutomationManager, { UploadEventOptions } from "../live/live-automation-manager";
@@ -38,10 +38,7 @@ export default class QQBotService {
   private Debug_SubscribeFree = false;
   private Debug_SubscribeFree_Interval: NodeJS.Timeout | null = null;
 
-  constructor(
-    private readonly liveAutomationManager: LiveAutomationManager,
-    private readonly dynamicAutomationManager: DynamicAutomationManager,
-  ) {}
+  constructor(private readonly liveAutomationManager: LiveAutomationManager, private readonly dynamicAutomationManager: DynamicAutomationManager) {}
 
   public async init() {
     const websocketClient = qqBotConfigManager.get("websocketClient");
@@ -258,7 +255,7 @@ export default class QQBotService {
             `- 直播间: ${userInfo.live_room.roomStatus === 0 ? "无" : userInfo.live_room.roomid}\n` +
             `- 订阅状态:\n` +
             `  - 直播间: ${_messages[0]}\n` +
-            `  - 主播动态: ${_messages[1]}`,
+            `  - 主播动态: ${_messages[1]}`
         ),
       ];
     };
@@ -383,7 +380,7 @@ export default class QQBotService {
             `- 直播间: ${userInfo.live_room.roomStatus === 0 ? "无" : userInfo.live_room.roomid}\n` +
             `- 授权状态:\n` +
             `  -${_messages[0]}\n` +
-            `  -${_messages[1]}`,
+            `  -${_messages[1]}`
         ),
       ];
     };
@@ -727,8 +724,8 @@ export default class QQBotService {
                         `  - 耗时: ${task.duration || "未知"}`
                       );
                     })
-                    .join("\n"),
-              ),
+                    .join("\n")
+              )
             );
           });
         });
@@ -769,8 +766,8 @@ export default class QQBotService {
                 `- 录制分段: ${recorder.getSegmentFilesCount()}\n` +
                 `- 录制时长: ${stats.ffmpegStats?.time || "未知"}\n` +
                 `- 录制帧率: ${stats.ffmpegStats?.fps || "未知"}\n` +
-                `- 文件大小: ${stats.ffmpegStats?.size || "未知"}`,
-            ),
+                `- 文件大小: ${stats.ffmpegStats?.size || "未知"}`
+            )
           );
         });
       }
@@ -798,7 +795,9 @@ export default class QQBotService {
         const roomInfo = await biliApi.getLiveRoomInfo(roomId);
 
         if (roomInfo.live_status !== LiveRoomStatus.LIVE) {
-          result.push(OneBotMessageUtils.Text(`${roomInfo.title}\n` + `- 直播间ID: ${roomId}\n` + `- 未在直播 🔴` + `${index !== rooms.length ? "\n\n" : ""}`));
+          result.push(
+            OneBotMessageUtils.Text(`${roomInfo.title}\n` + `- 直播间ID: ${roomId}\n` + `- 未在直播 🔴` + `${index !== rooms.length ? "\n\n" : ""}`)
+          );
 
           continue;
         }
@@ -904,7 +903,7 @@ export default class QQBotService {
             `- 直播间: ${userInfo.live_room.roomStatus === 0 ? "无" : userInfo.live_room.roomid}\n` +
             `- 设置结果:\n` +
             `  - 直播间: ${messages[0]}\n` +
-            `  - 主播动态: ${messages[1]}`,
+            `  - 主播动态: ${messages[1]}`
         ),
       ];
     });
@@ -1078,7 +1077,7 @@ export default class QQBotService {
                 `用户昵称: ${accountInfo.uname}\n` +
                 `用户ID: ${userAccount.getUid()}\n` +
                 (accountInfo.vip_label.text ? `会员: ${accountInfo.vip_label.text}\n` : "") +
-                `等级: Lv${accountInfo.level_info.current_level}`,
+                `等级: Lv${accountInfo.level_info.current_level}`
             ),
           ]);
         })
@@ -1135,7 +1134,9 @@ export default class QQBotService {
 
   private installLiveAutomationManagerEventListeners() {
     this.liveAutomationManager.on("live-start", async ({ roomId, hash: liveHash, roomInfo, isFirst }) => {
-      logger.debug(`收到 liveAutomationManager 开始直播(live-start)🟢 事件 -> live-start, roomId: ${roomId}, liveHash: ${liveHash}, isFirst: ${isFirst}`);
+      logger.debug(
+        `收到 liveAutomationManager 开始直播(live-start)🟢 事件 -> live-start, roomId: ${roomId}, liveHash: ${liveHash}, isFirst: ${isFirst}`
+      );
 
       if (isFirst) {
         logger.info(`房间 ${roomId} 为首次直播状态通知，跳过QQ直播通知`);
@@ -1176,7 +1177,8 @@ export default class QQBotService {
           try {
             const botUid = this.bot.getQID();
 
-            shouldAtAll = query.isOfficialGroup(roomId, gid) && ["admin", "owner"].includes((await this.bot.getGroupMemberInfo(gid, botUid)).data.role);
+            shouldAtAll =
+              query.isOfficialGroup(roomId, gid) && ["admin", "owner"].includes((await this.bot.getGroupMemberInfo(gid, botUid)).data.role);
           } catch (e) {
             logger.warn(`判断是否需要At全体时出错:`, e);
           }
@@ -1394,7 +1396,7 @@ export default class QQBotService {
   private installVideoUploaderEventListeners(
     videoUploader: VideoUploader,
     hash: string,
-    { file, roomInfo, live, recorder, userCard, additionalDesc }: UploadEventOptions,
+    { file, roomInfo, live, recorder, userCard, additionalDesc }: UploadEventOptions
   ) {
     const roomId = roomInfo.room_id;
 
@@ -1423,7 +1425,7 @@ export default class QQBotService {
             `录播开始投稿\n` +
               `hash: ${hash.substring(0, 7)}\n` +
               (additionalDesc ? `${additionalDesc}\n\n` : `\n`) +
-              `录制时长: ${FormatUtils.formatDurationWithoutSeconds(recorder.duration)}`,
+              `录制时长: ${FormatUtils.formatDurationWithoutSeconds(recorder.duration)}`
           ),
         ]);
 
@@ -1455,15 +1457,117 @@ export default class QQBotService {
           }
           await this.bot.sendGroup(parseInt(gid), [
             OneBotMessageUtils.Text(
-              `录播投稿完成✅\n` +
+              `录播投稿完成，等待转码审核⏳\n` +
                 `hash: ${hash.substring(0, 7)}\n\n` +
                 `录制时长: ${FormatUtils.formatDurationWithoutSeconds(recorder.duration)}\n\n` +
-                `投稿耗时: ${FormatUtils.formatDurationWithoutSeconds(uploadVideoInfo.duration)}\n` +
-                `视频地址: \nhttps://www.bilibili.com/video/${uploadVideoInfo.bvid}`,
+                `投稿耗时: ${FormatUtils.formatDurationWithoutSeconds(uploadVideoInfo.duration)}`
             ),
           ]);
 
           logger.debug(`群聊通知完成✅ -> Group ${gid}`);
+        });
+
+        const { tracker, bvid } = uploadVideoInfo;
+
+        const trackerTimeOut = setTimeout(() => {
+          logger.debug(`录播转码审核超时，已销毁追踪 -> ${bvid}, 通知群组...`);
+          tracker.destroy();
+
+          Object.entries(notifyGroups).forEach(async ([gid, group]) => {
+            if (!this.bot) {
+              logger.error("机器人实例对象不存在！");
+              return;
+            }
+            await this.bot.sendGroup(parseInt(gid), [OneBotMessageUtils.Text(`录播转码审核超时，已停止追踪⚠️\n` + `hash: ${hash.substring(0, 7)}`)]);
+
+            logger.debug(`群聊通知完成✅ -> Group ${gid}`);
+          });
+        }, 60 * 60 * 1000);
+
+        tracker.start();
+        tracker.on("auditStateChange", async (newState, lastState, detail) => {
+          if (newState === AuditState.OPEN) {
+            Object.entries(notifyGroups).forEach(async ([gid, group]) => {
+              if (!this.bot) {
+                logger.error("机器人实例对象不存在！");
+                return;
+              }
+              await this.bot.sendGroup(parseInt(gid), [
+                OneBotMessageUtils.Text(
+                  `录播审核已通过✅\n` + `hash: ${hash.substring(0, 7)}\n\n` + `视频地址: \nhttps://www.bilibili.com/video/${bvid}`
+                ),
+              ]);
+
+              logger.debug(`群聊通知完成✅ -> Group ${gid}`);
+            });
+
+            logger.debug("视频审核通过, 停止继续追踪");
+
+            tracker.stop();
+            clearTimeout(trackerTimeOut);
+          } else if (
+            newState !== AuditState.SUBMITTED &&
+            newState !== AuditState.SCHEDULED &&
+            newState !== AuditState.DELAY &&
+            newState !== AuditState.PENDING &&
+            newState !== AuditState.TRANSCODING &&
+            newState !== AuditState.UNKNOWN_60
+          ) {
+            logger.error("视频状态异常❌, 当前状态:", newState);
+            notifyEmitter.emit(
+              "msg-warn",
+              `${bvid} 视频状态异常❌, 当前状态: ${newState}\n视频地址: https://www.bilibili.com/video/${bvid}\n\n暂未停止追踪`
+            );
+
+            // tracker.stop();
+
+            let message = `录播转码审核未通过❌\n` + `hash: ${hash.substring(0, 7)}\n\n` + `状态：`;
+
+            if (newState === AuditState.TRANSCODE_FAIL) {
+              // 视频稿件问题
+              message += "转码失败❌";
+              const xcodeDetails = await tracker.getXcodeState();
+
+              xcodeDetails.forEach((detail, index) => {
+                message += `\n\n视频 ${index + 1} 问题: ${detail.fail_tip || "无"}`;
+              });
+            } else {
+              // 审核问题
+              if (detail.aegis_state === AuditAegisState.REJECT) {
+                // 这里使用 aegis_state 是因为哔哩哔哩web官方使用的就是aegis_state
+                message += "已退回⛔";
+              } else if (detail.aegis_state === AuditAegisState.LIMITED) {
+                message += "流量受影响📉";
+              } else if (detail.aegis_state === AuditAegisState.LOCKED) {
+                message += "已锁定🔒";
+              } else {
+                message += "未知状态❓";
+              }
+
+              if (!detail.problem_detail || detail.problem_detail.length === 0) {
+                message += "\n\n问题详情：未知";
+              } else {
+                detail.problem_detail.forEach((detail, index) => {
+                  message += `\n\n稿件问题 ${index + 1}:\n${detail.reject_reason}\n\n`;
+                  message += `违规时间点: ${detail.violation_time || "无"}\n\n`;
+                  message += `违规位置: ${detail.violation_position || "无"}\n\n`;
+                  message += `修改建议:\n${detail.modify_advise}`;
+                });
+              }
+            }
+
+            message += "\n\nBN SYSTEM";
+
+            Object.entries(notifyGroups).forEach(async ([gid, group]) => {
+              if (!this.bot) {
+                logger.error("机器人实例对象不存在！");
+                return;
+              }
+              await this.bot.sendGroup(parseInt(gid), [OneBotMessageUtils.Text(message)]);
+
+              logger.debug(`群聊通知完成✅ -> Group ${gid}`);
+            });
+          }
         });
       }
     });
@@ -1483,7 +1587,7 @@ class Utils {
           `🆔 直播间ID: ${roomInfo.room_id}\n` +
           `📝 直播间简介: ${roomInfo.description}\n` +
           `📊 直播间状态: ${Utils.getLiveRoomStatusText(roomInfo.live_status)}\n\n` +
-          `https://live.bilibili.com/${roomInfo.room_id}`,
+          `https://live.bilibili.com/${roomInfo.room_id}`
       ),
     ];
   }
@@ -1506,7 +1610,7 @@ class Utils {
           `🔑 直播场哈希: ${liveHash.substring(0, 7)}\n` +
           `⏰ 开播时间: ${FormatUtils.formatDateTime(liveTime)}\n` +
           `⏱️ 直播时长: ${FormatUtils.formatDurationDetailed(nowTiem.getTime() - liveTime.getTime())}\n\n` +
-          `https://live.bilibili.com/${roomInfo.room_id}`,
+          `https://live.bilibili.com/${roomInfo.room_id}`
       ),
     ];
   }
@@ -1539,7 +1643,7 @@ class Utils {
           `⏰ 开播时间: ${FormatUtils.formatDateTime(liveTime)}\n` +
           `🛑 关播时间: ${FormatUtils.formatDateTime(nowTiem)}\n` +
           `⏱️ 直播时长: ${FormatUtils.formatDurationDetailed(liveDuration)}\n\n` +
-          `https://live.bilibili.com/${liveEndRoomInfo.room_id}`,
+          `https://live.bilibili.com/${liveEndRoomInfo.room_id}`
       ),
     ];
   }

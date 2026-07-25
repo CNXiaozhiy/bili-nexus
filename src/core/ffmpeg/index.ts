@@ -578,6 +578,8 @@ export default class Ffmpeg {
       }
     }
 
+    args.push("-loglevel", "error");
+
     args.push("-i", inputUrl);
 
     // 时间点或帧号

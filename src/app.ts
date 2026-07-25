@@ -99,7 +99,7 @@ export class App {
     } else {
       // 注册默认账号
       defaultBiliAccount = BiliAccountService.registerDefault(
-        new UserAccount(defaultAccount, accounts[defaultAccount].cookie, accounts[defaultAccount].refresh_token),
+        new UserAccount(defaultAccount, accounts[defaultAccount].cookie, accounts[defaultAccount].refresh_token)
       );
     }
 
