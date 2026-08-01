@@ -580,6 +580,8 @@ export default class Ffmpeg {
       }
     }
 
+    args.push("-tls_verify", "0");
+
     args.push("-loglevel", "error");
 
     args.push("-i", inputUrl);
