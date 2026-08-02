@@ -796,7 +796,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
     );
 
     if (resp.data.code !== 0)
-      new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
+      throw new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
 
     return resp.data;
   }
@@ -827,7 +827,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
     );
 
     if (resp.data.code !== 0)
-      new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
+      throw new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
 
     return resp.data;
   }
@@ -943,7 +943,7 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
     );
 
     if (resp.data.code !== 0)
-      new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
+      throw new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
 
     return resp.data.data;
   }
