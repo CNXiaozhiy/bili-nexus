@@ -33,7 +33,7 @@ export interface RoomManageOptions {
 export interface UploadOptions {
   hash: string;
   file: string;
-  roomInfo: LiveRoomInfo; // 开播时的房间数据
+  roomInfo: LiveRoomInfo; // 最好是开播时的房间数据，一般直播结束的瞬间的数据也能用
   live: { startTime: number; stopTime: number; duration: number };
   recorder: { startTime: number; stopTime: number; duration: number };
   additionalDesc?: string;
@@ -316,6 +316,41 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       logger.error(hash + " 重试投稿失败❌", e);
       throw e;
     }
+  }
+
+  public manualAddFailedSubmission(options: {
+    hash: string;
+    file: string;
+    liveRoomInfo: LiveRoomInfo;
+    liveStartTime: number;
+    liveStopTime: number;
+    liveDuration: number;
+    recordStartTime: number;
+    recordStopTime: number;
+    recordDuration: number;
+    customOptions: CustomOptions;
+  }) {
+    const submissionFunc = async () => {
+      return await this.upload({
+        hash: options.hash,
+        file: options.file,
+        roomInfo: options.liveRoomInfo,
+        live: {
+          startTime: options.liveStartTime,
+          stopTime: options.liveStopTime,
+          duration: options.liveDuration,
+        },
+        recorder: {
+          startTime: options.recordStartTime,
+          stopTime: options.recordDuration,
+          duration: options.recordDuration,
+        },
+        customOptions: options.customOptions,
+      });
+    };
+
+    logger.debug("手动添加失败的投稿任务成功 -> " + options.hash);
+    this.failedSubmission.set(options.hash, submissionFunc);
   }
 
   // 用于强制结束程序
@@ -958,7 +993,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       videoInfo: {
         title: customOptions?.title || title,
         desc: customOptions?.desc || desc,
-        cover: customOptions?.cover || roomInfo.keyframe,
+        cover: customOptions?.cover || roomInfo.keyframe || roomInfo.user_cover,
         tid: customOptions?.tid || 27,
         tag: customOptions?.tag,
         season: {

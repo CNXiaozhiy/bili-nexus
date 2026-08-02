@@ -998,6 +998,150 @@ export default class QQBotService {
       return result;
     });
 
+    this.groupCommandProcessor.register("手动重投", async (args, context) => {
+      if (!Utils.auth(context.event.user_id, 10))
+        throw new AuthError("权限不足");
+
+      if (args.length !== 1 || parseInt(args[0]) < 0) {
+        return "手动重投 [Encoded Option]";
+      }
+
+      try {
+        const decoded = Buffer.from(args[0], "base64").toString("utf8");
+        const options = JSON.parse(decoded);
+
+        // hash: string;
+        // file: string;
+        // roomId?: number;
+        // liveRoomInfo: LiveRoomInfo; <- roomId 必要
+        // liveStartTime: number;
+        // liveStopTime: number;
+        // liveDuration: number;
+        // recordStartTime: number;
+        // recordStopTime: number;
+        // recordDuration: number;
+        // customOptions: CustomOptions;
+
+        // 存在校验
+        if (
+          !options.hash ||
+          !options.file ||
+          !options.liveStartTime ||
+          !options.liveStopTime ||
+          !options.liveDuration ||
+          !options.recordStartTime ||
+          !options.recordStopTime ||
+          !options.recordDuration
+        ) {
+          throw new Error("数据校验失败: 必要数据缺失");
+        }
+
+        // 类型校验
+        if (
+          typeof options.hash !== "string" ||
+          typeof options.file !== "string" ||
+          typeof options.liveStartTime !== "number" ||
+          typeof options.liveStopTime !== "number" ||
+          typeof options.liveDuration !== "number" ||
+          typeof options.recordStartTime !== "number" ||
+          typeof options.recordStopTime !== "number" ||
+          typeof options.recordDuration !== "number"
+        ) {
+          throw new Error("数据校验失败: 数据类型错误");
+        }
+
+        if (!options.liveRoomInfo) {
+          if (!options.roomId || typeof options.roomId !== "number") {
+            throw new Error("liveRoomInfo 补全失败: roomId 缺失");
+          }
+
+          options.liveRoomInfo = await BiliAccountService.getDefault()
+            .getBiliApi()
+            .getLiveRoomInfo(options.roomId);
+
+          logger.debug("liveRoomInfo 补全成功");
+        }
+
+        if (typeof options.liveRoomInfo !== "object") {
+          throw new Error("数据校验失败: liveRoomInfo 类型错误");
+        }
+
+        if (
+          !options.liveRoomInfo.title ||
+          !options.liveRoomInfo.uid ||
+          !options.liveRoomInfo.roomId ||
+          !options.liveRoomInfo.description ||
+          !options.liveRoomInfo.user_cover
+        ) {
+          throw new Error("liveRoomInfo 初检失败: 必要数据缺失");
+        }
+
+        if (options.customOptions) {
+          if (typeof options.customOptions !== "object") {
+            throw new Error("数据校验失败: customOptions 类型错误");
+          }
+
+          // account?: number;
+          // cover?: string;
+          // title?: string;
+          // desc?: string;
+          // tid?: number;
+          // tag?: string;
+
+          if (
+            options.customOptions.account &&
+            typeof options.customOptions.account !== "number"
+          ) {
+            throw new Error("数据校验失败: customOptions.account 类型错误");
+          }
+
+          if (
+            options.customOptions.cover &&
+            typeof options.customOptions.cover !== "string"
+          ) {
+            throw new Error("数据校验失败: customOptions.cover 类型错误");
+          }
+
+          if (
+            options.customOptions.title &&
+            typeof options.customOptions.title !== "string"
+          ) {
+            throw new Error("数据校验失败: customOptions.title 类型错误");
+          }
+
+          if (
+            options.customOptions.desc &&
+            typeof options.customOptions.desc !== "string"
+          ) {
+            throw new Error("数据校验失败: customOptions.desc 类型错误");
+          }
+
+          if (
+            options.customOptions.tid &&
+            typeof options.customOptions.tid !== "number"
+          ) {
+            throw new Error("数据校验失败: customOptions.tid 类型错误");
+          }
+
+          if (
+            options.customOptions.tag &&
+            typeof options.customOptions.tag !== "string"
+          ) {
+            throw new Error("数据校验失败: customOptions.tag 类型错误");
+          }
+        }
+
+        options.additionalDesc = "注意: 本次录像为手动重投";
+
+        this.liveAutomationManager.manualAddFailedSubmission(options);
+        this.liveAutomationManager.retryUpload(options.hash);
+        return "手动重投已开始✅";
+      } catch (e) {
+        logger.error("手动重投失败❌", e);
+        return "手动重投失败❌\n\n" + e;
+      }
+    });
+
     this.groupCommandProcessor.register("重新投稿", async (args, context) => {
       if (!Utils.auth(context.event.user_id, 10))
         throw new AuthError("权限不足");
