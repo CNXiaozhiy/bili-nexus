@@ -893,9 +893,9 @@ export default class QQBotService {
                             ? "失败 ❌"
                             : "操作 ⌛️"
                         }\n` +
-                        `  - 信息: ${task.message || "无"}\n` +
-                        `  - 进度: ${task.process || "无"}\n` +
-                        `  - 耗时: ${task.duration || "未知"}`
+                        (task.message ? `  - 信息: ${task.message}\n` : "") +
+                        (task.process ? `  - 进度: ${task.process}\n` : "") +
+                        `  - 耗时: ${Math.floor(task.duration / 1000) + " 秒"}`
                       );
                     })
                     .join("\n")
