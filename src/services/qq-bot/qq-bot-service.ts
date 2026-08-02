@@ -1003,7 +1003,7 @@ export default class QQBotService {
         throw new AuthError("权限不足");
 
       if (args.length !== 1 || parseInt(args[0]) < 0) {
-        return "设置UP官群 [UP主ID]";
+        return "重新投稿 [hash]";
       }
 
       logger.debug("开始重新投稿");
