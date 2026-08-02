@@ -1015,6 +1015,8 @@ export default class QQBotService {
             context.reply("未找到失败的投稿任务", {
               reference: true,
             });
+
+            return;
           }
           logger.info("重新投稿成功✅", resp);
         })
@@ -1022,7 +1024,7 @@ export default class QQBotService {
           logger.error("重新投稿失败❌", e);
         });
 
-      return "已重启投稿✅";
+      return null;
     });
 
     this.groupCommandProcessor.register("设置UP官群", async (args, context) => {
