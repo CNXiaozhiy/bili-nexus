@@ -21,8 +21,8 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
   public static BASE_RETRY_DELAY: number = 10000;
   public static MAX_RETRY_DELAY: number = 120000;
   public static MAX_RETRY_COUNT: number = Infinity;
-  public static WATCHDOG_CHECK_INTERVAL: number = 5000;
-  public static WATCHDOG_HEARTBEAT_TIMEOUT: number = 30000;
+  public static WATCHDOG_CHECK_INTERVAL: number = 30000;
+  public static WATCHDOG_HEARTBEAT_TIMEOUT: number = 60000;
 
   private logger;
 
@@ -79,8 +79,44 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
 
     this.watchdogTimeout = setInterval(() => {
       if (Date.now() - this.lastProgressHeartbeat > LiveRecorder.WATCHDOG_HEARTBEAT_TIMEOUT) {
-        this.logger.warn("[Watchdog]", "检测到录制进程长时间未响应❌，可能已经卡死，结束Ffmpeg进程");
-        this.recFfmpeg?.kill();
+        this.logger.warn("[Watchdog]", "检测到录制进程长时间未响应❌，可能已经卡死，准备结束分段");
+        this._killWatchdog();
+        this.logger.debug("[Watchdog]", "killed Watchdog");
+
+        this.logger.debug("[Watchdog]", "当前分段文件数组", this.segmentFiles);
+
+        if (this.ffmpegStats) {
+          this.logger.debug("[Watchdog]", "当前分段ffmpegStats", this.ffmpegStats);
+          this.totalDuration += TimeUtils.parseTimeToMsRegex(this.ffmpegStats.time!);
+          this.logger.debug("[Watchdog]", "totalDuration 更新成功", this.totalDuration, ", 本次分段 stats.time: ", this.ffmpegStats.time);
+        } else {
+          this.logger.debug("[Watchdog]", "totalDuration 更新失败, 本次分段录制失败, 无 stats 数据");
+          // 录制失败
+        }
+
+        if (!this.recFfmpeg) {
+          this.logger.error("[Watchdog]", "录制进程不存在，尝试重启进程");
+          this.retryRecord();
+        } else {
+          this.recFfmpeg.removeAllListeners();
+
+          const timeout = setTimeout(() => {
+            this.logger.warn("[Watchdog]", "录制进程无法安全结束，强制结束并重启进程");
+            this.recFfmpeg?.removeAllListeners();
+            this.recFfmpeg?.kill();
+            this.retryRecord();
+          }, 10 * 1000);
+
+          this.recFfmpeg.once("exit", () => {
+            clearTimeout(timeout);
+
+            this.logger.info("[Watchdog]", "录制进程已安全退出，尝试重启进程");
+            this.retryRecord();
+          });
+
+          this.logger.warn("[Watchdog]", "尝试安全结束录制进程");
+          this.recFfmpeg.stop();
+        }
       }
     }, LiveRecorder.WATCHDOG_CHECK_INTERVAL);
   }
@@ -269,6 +305,13 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
           this.logger.info(`${this.hash.substring(0, 32)} -> Ffmpeg 进程已被 stopRecord() 关闭，录制已结束`);
           this.logger.debug(`${this.hash.substring(0, 32)} -> stopRecord() -> stoped() 录制已完成`);
           if (forceTimeout) clearTimeout(forceTimeout);
+
+          if (this.ffmpegStats) {
+            this.totalDuration += TimeUtils.parseTimeToMsRegex(this.ffmpegStats.time!);
+            this.logger.debug("totalDuration 更新成功", this.totalDuration, ", 本次分段 stats.time: ", this.ffmpegStats.time);
+          } else {
+            this.logger.debug("totalDuration 更新失败, 本次分段录制失败, 无 stats 数据");
+          }
 
           _stop();
         };
