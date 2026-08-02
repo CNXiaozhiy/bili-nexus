@@ -362,73 +362,79 @@ export default class VideoUploader extends EventEmitter<{
       if (videoInfo.season) {
         task = pushTask("添加至合集");
 
-        this.logger.info(`即将添加至合集 ->`, videoInfo.season);
-        let seasonResp = await this.biliApi.getSeasons({
-          page: 1,
-          pageNumber: 30,
-        });
-
-        if (videoInfo.season && videoInfo.season.sectionId) {
-          await this.addToSeason(videoInfo.season.sectionId, {
-            aid: resp.aid,
-            cid: bizIds[0],
-            title: videoInfo.title,
+        try {
+          this.logger.info(`即将添加至合集 ->`, videoInfo.season);
+          let seasonResp = await this.biliApi.getSeasons({
+            page: 1,
+            pageNumber: 30,
           });
-          this.logger.info(
-            `已将视频添加至合集 -> ${videoInfo.season.sectionId}(sectionId)`
-          );
-          task.success();
-        } else if (
-          videoInfo.season &&
-          (videoInfo.season.seasonId || videoInfo.season.name)
-        ) {
-          let season = seasonResp.seasons.find(
-            videoInfo.season.seasonId
-              ? (e) => e.season.id === videoInfo.season?.seasonId
-              : (e) => e.season.title === videoInfo.season?.name
-          );
 
-          if (!season && videoInfo.season.name && videoInfo.season.autoCreate) {
-            this.logger.info(
-              `合集 ${videoInfo.season.name} 不存在, 开始自动创建`
-            );
-            const { data: seasonId } = await this.biliApi.addSeason({
-              title: videoInfo.season.name,
-              cover: videoInfo.season.autoCreate.cover,
-              desc: videoInfo.season.autoCreate.desc || "",
-            });
-            this.logger.info(`合集创建成功, 合集ID:`, seasonId);
-
-            // 重新获取
-            seasonResp = await this.biliApi.getSeasons({
-              page: 1,
-              pageNumber: 30,
-            });
-            season = seasonResp.seasons.find((e) => e.season.id === seasonId);
-          }
-
-          if (!season) {
-            this.logger.error(
-              `添加至合集失败: 未找到合集, by ->`,
-              videoInfo.season
-            );
-            warnings.push(
-              `添加至合集失败: 未找到合集 ${JSON.stringify(videoInfo.season)}`
-            );
-          } else {
-            const sectionId = season.sections.sections[0].id;
-            this.logger.debug(
-              `找到合集小节ID (sectionId) -> ${sectionId}, by ->`,
-              videoInfo.season
-            );
-            await this.addToSeason(sectionId, {
+          if (videoInfo.season && videoInfo.season.sectionId) {
+            await this.addToSeason(videoInfo.season.sectionId, {
               aid: resp.aid,
               cid: bizIds[0],
               title: videoInfo.title,
             });
-            this.logger.info(`已将视频添加至合集 -> ${season.season.title}`);
+            this.logger.info(
+              `已将视频添加至合集 -> ${videoInfo.season.sectionId}(sectionId)`
+            );
             task.success();
+          } else if (
+            videoInfo.season &&
+            (videoInfo.season.seasonId || videoInfo.season.name)
+          ) {
+            let season = seasonResp.seasons?.find(
+              videoInfo.season.seasonId
+                ? (e) => e.season.id === videoInfo.season?.seasonId
+                : (e) => e.season.title === videoInfo.season?.name
+            );
+
+            if (
+              !season &&
+              videoInfo.season.name &&
+              videoInfo.season.autoCreate
+            ) {
+              this.logger.info(
+                `合集 ${videoInfo.season.name} 不存在, 开始自动创建`
+              );
+              const { data: seasonId } = await this.biliApi.addSeason({
+                title: videoInfo.season.name,
+                cover: videoInfo.season.autoCreate.cover,
+                desc: videoInfo.season.autoCreate.desc || "",
+              });
+              this.logger.info(`合集创建成功, 合集ID:`, seasonId);
+
+              // 重新获取
+              seasonResp = await this.biliApi.getSeasons({
+                page: 1,
+                pageNumber: 30,
+              });
+              season = seasonResp.seasons?.find(
+                (e) => e.season.id === seasonId
+              );
+            }
+
+            if (!season) {
+              throw new Error(`找不到合集 -> ${videoInfo.season.name}`);
+            } else {
+              const sectionId = season.sections.sections[0].id;
+              this.logger.debug(
+                `找到合集小节ID (sectionId) -> ${sectionId}, by ->`,
+                videoInfo.season
+              );
+              await this.addToSeason(sectionId, {
+                aid: resp.aid,
+                cid: bizIds[0],
+                title: videoInfo.title,
+              });
+              this.logger.info(`已将视频添加至合集 -> ${season.season.title}`);
+              task.success();
+            }
           }
+        } catch (e) {
+          this.logger.error(`添加至合集失败:`, e);
+          warnings.push(`添加至合集失败: ${e}`);
+          task.error((e as Error).message);
         }
       }
 
