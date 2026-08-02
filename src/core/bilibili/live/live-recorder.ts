@@ -10,8 +10,6 @@ import FormatUtils from "@/utils/format";
 import TimeUtils from "@/utils/time";
 import notifyEmitter from "@/core/app/notify-emitter";
 
-// const logger = getLogger("LiveRecorder");
-
 export interface LiveRecorderEvents {
   start: [isFirst: boolean];
   progress: [stats: FfmpegStats];
@@ -19,12 +17,12 @@ export interface LiveRecorderEvents {
   err: [error: Error];
 }
 
-type SegMentFileMate = { start: number; end: number };
-
 export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
   public static BASE_RETRY_DELAY: number = 10000;
   public static MAX_RETRY_DELAY: number = 120000;
   public static MAX_RETRY_COUNT: number = Infinity;
+  public static WATCHDOG_CHECK_INTERVAL: number = 5000;
+  public static WATCHDOG_HEARTBEAT_TIMEOUT: number = 30000;
 
   private logger;
 
@@ -38,13 +36,20 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
   private recFfmpeg: RecordFfmpeg | null = null;
   private ffmpegRunning: boolean = false;
 
-  private segmentFiles = new Map<string, SegMentFileMate>();
+  private segmentFiles: string[] = [];
 
   // Stats
   private retryCount: number = 0;
   private startTime: number = 0;
   private stopTime: number = 0;
+  private totalDuration: number = 0;
+
+  // Important
   private ffmpegStats: FfmpegStats | null = null;
+
+  // Watchdog
+  private lastProgressHeartbeat: number = 0;
+  private watchdogTimeout: NodeJS.Timeout | null = null;
 
   private retryTimeout: NodeJS.Timeout | null = null;
 
@@ -69,71 +74,19 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     this.recordingDir = path.resolve(options.recordingDir);
   }
 
-  // 低于 60s 的录制会被忽略，duration 为 ms
-  private checkDuration() {
-    let index = 0;
-    for (const [filePath, meta] of this.segmentFiles) {
-      if (!meta.end) {
-        this.logger.warn("逻辑错误，meta.end 未设置");
-        meta.end = Date.now();
-      }
-      const duration = meta.end - meta.start;
-      if (duration < 60000) {
-        this.logger.debug(`分段 [${index}] -> 录制时长过短: ${duration / 1000}s , 删除分段`);
+  private _runWatchdog() {
+    this._killWatchdog();
 
-        this.segmentFiles.delete(filePath);
-
-        if (!fs.existsSync(filePath)) {
-          this.logger.debug(`删除不足60s的分段 [${index}] -> 录制文件不存在: ${filePath}`);
-          return;
-        }
-        try {
-          fs.unlinkSync(filePath);
-        } catch (e) {
-          this.logger.error(`删除不足60s的分段 [${index}] -> 失败, err: `, e);
-        }
-      } else {
-        this.logger.debug(`分段 [${index}] -> 录制时长: ${FormatUtils.formatDurationDetailed(duration)} , 保留分段`);
+    this.watchdogTimeout = setInterval(() => {
+      if (Date.now() - this.lastProgressHeartbeat > LiveRecorder.WATCHDOG_HEARTBEAT_TIMEOUT) {
+        this.logger.warn("[Watchdog]", "检测到录制进程长时间未响应❌，可能已经卡死，结束Ffmpeg进程");
+        this.recFfmpeg?.kill();
       }
-      index++;
-    }
+    }, LiveRecorder.WATCHDOG_CHECK_INTERVAL);
   }
 
-  private checkSegmentFiles() {
-    this.segmentFiles.forEach((meta, filePath) => {
-      if (!fs.existsSync(filePath)) {
-        this.logger.debug("checkSegmentFiles -> 文件不存在 ❌", filePath);
-        if (!this.segmentFiles.delete(filePath)) {
-          this.logger.warn("删除 segmentFiles 元素失败", filePath, "Map ->", this.segmentFiles);
-        } else {
-          this.logger.debug("已删除 segmentFile 元素", filePath);
-        }
-      }
-    });
-  }
-
-  private _getCuttentSegmentFileMate() {
-    const segmentFiles = Array.from(this.segmentFiles);
-    const segmentFile = segmentFiles[segmentFiles.length - 1];
-    const segmentFileFilePath = segmentFile[0];
-    const segmentFileMate = segmentFile[1];
-
-    return {
-      segmentFileFilePath,
-      segmentFileMate,
-      segmentFinished: !!segmentFileMate.end,
-    };
-  }
-
-  private _setCurrentSegmentFileMateEndTime() {
-    const { segmentFileFilePath, segmentFileMate, segmentFinished } = this._getCuttentSegmentFileMate();
-
-    if (segmentFinished) {
-      this.logger.warn("分段已结束，设置结束失败");
-    } else {
-      segmentFileMate.end = Date.now();
-      this.logger.debug("已设置分段的结束时间 ->", segmentFileFilePath, "mate ->", segmentFileMate);
-    }
+  private _killWatchdog() {
+    if (this.watchdogTimeout) clearInterval(this.watchdogTimeout);
   }
 
   public startRecord() {
@@ -146,12 +99,6 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     }
 
     const filePath = this.generateNewFilePath(this.getSegmentFilesCount());
-
-    // 浅拷贝
-    this.segmentFiles.set(filePath, {
-      start: Date.now(),
-      end: 0,
-    });
 
     this.ffmpegStats = null;
     this.logger.debug("录制开始，已清理之前的ffmpegStats");
@@ -167,32 +114,109 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
       this.retryCount = 0;
       this.ffmpegRunning = true;
       this.logger.debug("录制进程即将开始工作 ⏳");
-      this.logger.info(`${this.hash.substring(0, 32)} -> 分段[${this.getSegmentFilesCount() - 1}] 即将开始录制 ⏳`);
+      this.logger.info(`${this.hash.substring(0, 32)} -> 分段[${this.getSegmentFilesCount()}] 即将开始录制 ⏳`);
       this.emit("start", isFirst);
+
+      this.logger.info("看门狗已启动✅");
+      this._runWatchdog();
     });
 
     this.recFfmpeg.on("progress", (stats: FfmpegStats) => {
-      if (!this.ffmpegStats) this.logger.info("录制真正开始✅ 🔴REC");
+      if (!stats.time) {
+        this.logger.debug("异常行为：录制进程返回了空的录制时间❌", stats);
+        return;
+      }
+
+      this.lastProgressHeartbeat = Date.now();
+
+      if (!this.ffmpegStats) {
+        this.logger.info("录制真正开始✅ 🔴REC");
+
+        if (!fs.existsSync(filePath)) {
+          this.logger.warn("异常行为：录制文件不存在❌", filePath);
+          notifyEmitter.emit("msg-warn", `${this.hash} 录制出现异常行为：录制真正开始后未找到录制文件❌\n\n${filePath}`);
+        }
+
+        this.logger.debug("文件已进入segmentFiles");
+        this.segmentFiles.push(filePath);
+      }
       this.ffmpegStats = stats;
       this.emit("progress", stats);
     });
 
     this.recFfmpeg.once("exit", (code, signal) => {
       this.ffmpegRunning = false;
-      this._setCurrentSegmentFileMateEndTime();
       this.logger.info(`${this.hash.substring(0, 32)} -> ffmpeg 退出 ❌, code:`, code);
+
+      this.logger.debug("看门狗已 Killed✅");
+      this._killWatchdog();
+
+      // 检查录制是否成功
+      if (!this.ffmpegStats) {
+        // 从进程启动到退出都没开始录制
+        this.logger.warn(`${this.hash.substring(0, 32)} -> 未检测到 ffmpeg 的输出信息 ❌ （本分段录制失败）`, this.ffmpegStats);
+
+        try {
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        } catch (e) {
+          this.logger.error(`删除录制文件失败:`, e);
+        }
+
+        // 此时 segmentFile 还没进入 segmentFiles
+      } else {
+        this.logger.info(`分段[${this.getSegmentFilesCount()}] 录制成功✅，录制时长: ${this.ffmpegStats.time!}`);
+
+        this.totalDuration += TimeUtils.parseTimeToMsRegex(this.ffmpegStats.time!);
+        this.logger.debug(`当前总时长: ${this.totalDuration}`);
+      }
+
+      // 检查时长
+      // if (TimeUtils.parseTimeToMsRegex(this.ffmpegStats.time!) < 10 * 1000) {
+      //   this.logger.warn(
+      //     `${this.hash.substring(
+      //       0,
+      //       32
+      //     )} -> 录制时长太短 <10s❌，可能是网络问题，将进行重试`
+      //   );
+
+      //   try {
+      //     if (fs.existsSync(filePath)) {
+      //       this.logger.info("删除时长不足的录制文件成功✅", filePath);
+      //       fs.unlinkSync(filePath);
+      //     }
+      //   } catch (e) {
+      //     this.logger.error(`删除录制文件失败❌:`, e);
+      //   }
+
+      //   if (this.segmentFiles[this.segmentFiles.length - 1] === filePath) {
+      //     this.logger.debug("文件已从 segmentFiles 移除");
+      //     this.segmentFiles.pop();
+      //   } else {
+      //     this.logger.warn(
+      //       "异常行为：当前分段录制文件不是最后一个录制文件❌",
+      //       filePath
+      //     );
+      //     notifyEmitter.emit(
+      //       "msg-warn",
+      //       `${this.hash} 录制出现异常行为：当前分段录制文件不是最后一个录制文件❌\n\n${filePath}`
+      //     );
+      //   }
+      // }
+
       if (code == 0) return; // 交给 done 事件处理
+
+      // 异常退出
+      this.logger.warn(`${this.hash.substring(0, 32)} -> ffmpeg 异常退出 ❌，将在5s后重试录制`);
+
+      setTimeout(() => {
+        this.logger.info(`${this.hash.substring(0, 32)} -> 重试录制`);
+        this.retryRecord();
+      });
     });
 
     this.recFfmpeg.once("err", (error: FfmpegError) => {
-      this.logger.error(`${this.hash.substring(0, 32)} -> 录制失败 ❌`, error);
+      this.logger.error(`${this.hash.substring(0, 32)} -> 录制出错 ❌`, error);
       this.emit("err", error);
-      this.recFfmpeg?.kill();
-      setTimeout(() => {
-        this.logger.debug(`${this.hash.substring(0, 32)} -> 收到事件 recFfmpeg.event.err -> 将在 5s 后尝试重试录制`);
-        this.checkDuration();
-        this.retryRecord();
-      }, 5000);
     });
 
     this.recFfmpeg.once("done", async (outputPath, stats) => {
@@ -212,7 +236,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
 
     if (this.retryTimeout) clearTimeout(this.retryTimeout);
     this.logger.info(`${this.hash.substring(0, 32)} -> stopRecord()`);
-    this.logger.debug(`${this.hash.substring(0, 32)} -> 将设置(覆盖) stopTime, segmentMate`);
+    this.logger.debug(`${this.hash.substring(0, 32)} -> 将设置(覆盖) stopTime`);
     this.stopTime = Date.now();
 
     return await new Promise<{
@@ -224,15 +248,11 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
       const _stop = () => {
         this.logger.debug(`录制 _stop -> 结束`);
 
-        this._setCurrentSegmentFileMateEndTime();
-
         this.logger.info(`录制时长: ${FormatUtils.formatDurationWithoutSeconds(this.getDuration())}`);
 
         this.recFfmpeg = null;
         this.ffmpegRunning = false;
         this.logger.debug(`结束标志设置完成 ffmpegRunning -> false, recFfmpeg -> null`);
-
-        this.checkSegmentFiles();
 
         resolve({
           segmentFiles: this.getSegmentFiles(),
@@ -306,7 +326,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
       concatFfmpeg.once("done", (outputPath) => {
         this.logger.info("合并文件完成，开始清理文件");
 
-        this.segmentFiles.forEach((_, filePath) => {
+        this.segmentFiles.forEach((filePath) => {
           try {
             fs.unlinkSync(filePath);
             this.logger.info(`文件清理成功:`, filePath);
@@ -315,21 +335,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
           }
         });
 
-        const _metas = this.segmentFiles.entries().next().value;
-        this.segmentFiles.clear();
-
-        if (_metas) {
-          this.segmentFiles.set(outputPath, { ..._metas[1] });
-          this.logger.debug("合并后的分段已使用第一次分段的 meta");
-        } else {
-          this.logger.warn("未找到最初的录制分段，合并后的分段开始时间将以十分钟之前开始计算");
-          this.logger.warn("⚠️ 不应该出现的问题，请报告开发者");
-          notifyEmitter.emit("msg-warn", `致命Bug🐛：在 stopRecordAndMerge 中未找到第一次分段的meta`);
-          this.segmentFiles.set(outputPath, {
-            start: Date.now() - 10 * 60 * 1000,
-            end: Date.now(),
-          });
-        }
+        this.segmentFiles = [];
 
         resolve({
           ...resp,
@@ -358,13 +364,13 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
   public getSegmentFilesCount() {
     this._checkIfDestroyed();
 
-    return this.segmentFiles.size;
+    return this.segmentFiles.length;
   }
 
   public getSegmentFiles() {
     this._checkIfDestroyed();
 
-    return Array.from(this.segmentFiles).map(([filePath]) => filePath);
+    return this.segmentFiles;
   }
 
   public generateNewFilePath(index: number | string, timestamp = Date.now()) {
@@ -417,7 +423,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
 
     if (deleteFile) {
       this.logger.info("开始删除录像文件");
-      this.segmentFiles.forEach((_, filePath) => {
+      this.segmentFiles.forEach((filePath) => {
         try {
           fs.unlinkSync(filePath);
           this.logger.info(`删除录制文件 ${filePath} 成功 ✅`);
@@ -427,7 +433,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
       });
     }
 
-    this.segmentFiles.clear();
+    this.segmentFiles = [];
     this.retryCount = 0;
     this.startTime = 0;
     this.stopTime = 0;
@@ -438,9 +444,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
   public getDuration() {
     this._checkIfDestroyed();
 
-    return Array.from(this.segmentFiles)
-      .map(([, mate]) => mate.end - mate.start)
-      .reduce((acc, cur) => acc + cur, 0);
+    return this.totalDuration;
   }
 
   public destroy(deleteFile = false) {
@@ -451,7 +455,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     this.stopRecord()
       .then(() => {
         if (deleteFile) {
-          this.segmentFiles.forEach((_, filePath) => {
+          this.segmentFiles.forEach((filePath) => {
             try {
               fs.unlinkSync(filePath);
               this.logger.info(`文件清理成功:`, filePath);
