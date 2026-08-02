@@ -1,3 +1,5 @@
+import { AxiosError } from "axios";
+
 /**
  * 工具函数集合
  */
@@ -8,16 +10,24 @@ export default class FormatUtils {
    * @param separator 分隔符，默认为逗号
    * @returns 格式化后的字符串
    */
-  static addThousandsSeparator(num: number | string, separator: string = ","): string {
+  static addThousandsSeparator(
+    num: number | string,
+    separator: string = ","
+  ): string {
     // 转换为字符串并处理小数部分
     const numStr = num.toString();
     const [integerPart, decimalPart] = numStr.split(".");
 
     // 为整数部分添加千位分隔符
-    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, separator);
+    const formattedInteger = integerPart.replace(
+      /\B(?=(\d{3})+(?!\d))/g,
+      separator
+    );
 
     // 如果有小数部分，重新拼接
-    return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+    return decimalPart
+      ? `${formattedInteger}.${decimalPart}`
+      : formattedInteger;
   }
 
   /**
@@ -26,8 +36,14 @@ export default class FormatUtils {
    * @param fillZero 是否补零，默认为 true
    * @returns 格式化后的时间字符串
    */
-  static formatDateTime(date: Date | number | string = new Date(), fillZero: boolean = true): string {
-    const dateObj = typeof date === "string" || typeof date === "number" ? new Date(date) : date;
+  static formatDateTime(
+    date: Date | number | string = new Date(),
+    fillZero: boolean = true
+  ): string {
+    const dateObj =
+      typeof date === "string" || typeof date === "number"
+        ? new Date(date)
+        : date;
 
     if (isNaN(dateObj.getTime())) {
       throw new Error("Invalid date");
@@ -45,7 +61,9 @@ export default class FormatUtils {
       return fillZero ? num.toString().padStart(2, "0") : num.toString();
     };
 
-    return `${year}-${padZero(month)}-${padZero(day)} ${padZero(hours)}:${padZero(minutes)}:${padZero(seconds)}`;
+    return `${year}-${padZero(month)}-${padZero(day)} ${padZero(
+      hours
+    )}:${padZero(minutes)}:${padZero(seconds)}`;
   }
 
   /**
@@ -166,7 +184,11 @@ export default class FormatUtils {
    * @param promise 仅用于unhandledRejection的Promise对象
    * @returns 格式化后的错误文本
    */
-  static formatErrorMessage(type: string, error: Error | any, promise: Promise<any> | null = null) {
+  static formatErrorMessage(
+    type: string,
+    error: Error | any,
+    promise: Promise<any> | null = null
+  ) {
     const timestamp = new Date().toISOString();
     let message = `错误类型: ${type}\n`;
     message += `出错时间: ${timestamp}\n`;
@@ -185,18 +207,45 @@ export default class FormatUtils {
           message += `额外属性:\n${extraProps}\n`;
         }
       }
+    } else if (error instanceof AxiosError) {
+      message += `错误名称: ${error.name}\n`;
+      message += `错误信息: ${error.message}\n`;
+      message += `错误响应数据: ${
+        JSON.stringify(error.response?.data) || "无响应数据"
+      }\n`;
+      message += `错误堆栈:\n${error.stack || "无堆栈信息"}\n`;
     } else {
-      message += `错误内容: ${JSON.stringify(error, null, 2)}\n`;
+      message += `错误内容: ${safeStringify(error)}\n`;
     }
 
     if (type === "unhandledRejection" && promise) {
       message += `Promise状态: ${promise}\n`;
     }
 
-    message += `运行环境: Node.js ${process.version}\n`;
-    message += `工作目录: ${process.cwd()}\n`;
-    message += `内存使用: ${JSON.stringify(process.memoryUsage())}\n`;
-
     return message;
   }
+}
+
+function safeStringify(obj: any) {
+  const seen = new WeakSet();
+  return JSON.stringify(
+    obj,
+    (key, value) => {
+      if (typeof value === "object" && value !== null) {
+        if (seen.has(value)) {
+          return "[Circular Reference]";
+        }
+        seen.add(value);
+
+        if (
+          value.constructor?.name === "ClientRequest" ||
+          value.constructor?.name === "IncomingMessage"
+        ) {
+          return `[${value.constructor.name}]`;
+        }
+      }
+      return value;
+    },
+    2
+  );
 }
