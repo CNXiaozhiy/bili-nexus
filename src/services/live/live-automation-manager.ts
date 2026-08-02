@@ -1199,4 +1199,8 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
     return uploaders;
   }
+
+  public getUploader(hash: string) {
+    return this.videoUploaders.get(hash);
+  }
 }

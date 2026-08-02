@@ -846,8 +846,19 @@ export default class QQBotService {
       for (let _roomId of rooms) {
         index++;
         const roomId = parseInt(_roomId);
-        const uploaders =
+        let uploaders =
           this.liveAutomationManager.getUploadersMapByRoomId(roomId);
+
+        if (typeof args[0] === "string") {
+          const uploader = this.liveAutomationManager.getUploader(args[0]);
+
+          if (uploader) {
+            uploaders = new Map<string, VideoUploader>();
+            uploaders.set(args[0], uploader);
+          } else {
+            return "未找到指定的投稿器";
+          }
+        }
 
         result.push(OneBotMessageUtils.Text(`直播间${_roomId} 投稿器列表:`));
         if (uploaders.size === 0) {
