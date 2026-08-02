@@ -1,11 +1,36 @@
-import XzQBot, { ReplyFunction, XzQBotError, XzQBotSendError } from "@/core/bot/xz-qbot";
-import { GroupMessageEvent, MessageEvent, Messages, OneBotMessageUtils, PrivateMessageEvent, SegmentMessage, SegmentMessages } from "@/types/one-bot";
-import { AuditAegisState, AuditState, DynamicNewCardsMember, LiveRoomInfo, LiveRoomStatus } from "@/types/bilibili";
+import XzQBot, {
+  ReplyFunction,
+  XzQBotError,
+  XzQBotSendError,
+} from "@/core/bot/xz-qbot";
+import {
+  GroupMessageEvent,
+  MessageEvent,
+  Messages,
+  OneBotMessageUtils,
+  PrivateMessageEvent,
+  SegmentMessage,
+  SegmentMessages,
+} from "@/types/one-bot";
+import {
+  AuditAegisState,
+  AuditState,
+  DynamicNewCardsMember,
+  LiveRoomInfo,
+  LiveRoomStatus,
+} from "@/types/bilibili";
 import { QQBotServiceSetupError } from "@/types/errors/qq-bot";
 import getLogger from "@/utils/logger";
-import LiveAutomationManager, { UploadEventOptions } from "../live/live-automation-manager";
+import LiveAutomationManager, {
+  UploadEventOptions,
+} from "../live/live-automation-manager";
 import DynamicAutomationManager from "../dynamic/dynamic-automation-manager";
-import { appConfigManager, liveConfigManager, qqBotConfigManager, userDynamicConfigManager } from "@/common";
+import {
+  appConfigManager,
+  liveConfigManager,
+  qqBotConfigManager,
+  userDynamicConfigManager,
+} from "@/common";
 import { DataStore } from "@/common/config";
 import notifyEmitter from "@/core/app/notify-emitter";
 import { loginAccount } from "@/core/bilibili/account-login";
@@ -18,6 +43,7 @@ import BiliUtils from "@/utils/bili";
 import BiliAccountService from "../account/bili-account-service";
 import SpaceDynamicRender from "@/core/bilibili/dynamic/space-dynamic-render";
 import { getVersion } from "../version";
+import { AxiosError } from "axios";
 
 const logger = getLogger("QQBotService");
 
@@ -31,19 +57,33 @@ type ProcessorContext<T, F = ReplyFunction<any>> = {
 
 export default class QQBotService {
   private bot: XzQBot | null = null;
-  private commandProcessor = new CommandProcessor<ProcessorContext<MessageEvent>, Messages | null>();
-  private groupCommandProcessor = new CommandProcessor<ProcessorContext<GroupMessageEvent>, Messages | null>();
-  private privateCommandProcessor = new CommandProcessor<ProcessorContext<PrivateMessageEvent>, Messages | null>();
+  private commandProcessor = new CommandProcessor<
+    ProcessorContext<MessageEvent>,
+    Messages | null
+  >();
+  private groupCommandProcessor = new CommandProcessor<
+    ProcessorContext<GroupMessageEvent>,
+    Messages | null
+  >();
+  private privateCommandProcessor = new CommandProcessor<
+    ProcessorContext<PrivateMessageEvent>,
+    Messages | null
+  >();
 
   private Debug_SubscribeFree = false;
   private Debug_SubscribeFree_Interval: NodeJS.Timeout | null = null;
 
-  constructor(private readonly liveAutomationManager: LiveAutomationManager, private readonly dynamicAutomationManager: DynamicAutomationManager) {}
+  constructor(
+    private readonly liveAutomationManager: LiveAutomationManager,
+    private readonly dynamicAutomationManager: DynamicAutomationManager
+  ) {}
 
   public async init() {
     const websocketClient = qqBotConfigManager.get("websocketClient");
     if (!websocketClient || !websocketClient.url) {
-      throw new QQBotServiceSetupError("未配置 websocketClient.url, 请在 config/qq-bot.json 中配置后重启服务");
+      throw new QQBotServiceSetupError(
+        "未配置 websocketClient.url, 请在 config/qq-bot.json 中配置后重启服务"
+      );
     }
 
     this.bot = new XzQBot(websocketClient.url, qqBotConfigManager.get("qq"));
@@ -157,7 +197,11 @@ export default class QQBotService {
     //   return null;
     // });
 
-    const subscribeLiveRoom = (qid: number, gid: number, roomId: number): string => {
+    const subscribeLiveRoom = (
+      qid: number,
+      gid: number,
+      roomId: number
+    ): string => {
       const liveRoomsConfig = qqBotConfigManager.get("liveRoom");
 
       const roomConfig = liveRoomsConfig[roomId.toString()];
@@ -172,7 +216,9 @@ export default class QQBotService {
           users: [],
         };
       } else if (!Array.isArray(roomConfig.group[gid].users)) {
-        logger.warn(`当前群聊 ${gid} 配置中订阅用户组不为数组, 将初始化为空用户组`);
+        logger.warn(
+          `当前群聊 ${gid} 配置中订阅用户组不为数组, 将初始化为空用户组`
+        );
         roomConfig.group[gid].users = [];
       }
 
@@ -180,16 +226,24 @@ export default class QQBotService {
         roomConfig.group[gid].users.push(qid);
         qqBotConfigManager.set("liveRoom", liveRoomsConfig);
 
-        const _liveRoomConfig = liveConfigManager.get("rooms")[roomId.toString()];
+        const _liveRoomConfig =
+          liveConfigManager.get("rooms")[roomId.toString()];
 
-        if (!_liveRoomConfig) return "订阅成功 🎉\n\n" + "警告⚠️: 主直播间配置未初始化, 请联系管理员处理";
+        if (!_liveRoomConfig)
+          return (
+            "订阅成功 🎉\n\n" + "警告⚠️: 主直播间配置未初始化, 请联系管理员处理"
+          );
         return "订阅成功 🎉";
       } else {
         throw "你已经订阅过该直播间";
       }
     };
 
-    const subscribeUserDynamic = (qid: number, gid: number, userId: number): string => {
+    const subscribeUserDynamic = (
+      qid: number,
+      gid: number,
+      userId: number
+    ): string => {
       const usersDynamicConfig = qqBotConfigManager.get("userDynamic");
       const userConfig = usersDynamicConfig[userId.toString()];
 
@@ -204,7 +258,9 @@ export default class QQBotService {
           users: [],
         };
       } else if (!Array.isArray(userConfig.group[gid].users)) {
-        logger.warn(`当前群聊 ${gid} 配置中订阅用户组不为数组, 将初始化为空用户组`);
+        logger.warn(
+          `当前群聊 ${gid} 配置中订阅用户组不为数组, 将初始化为空用户组`
+        );
         userConfig.group[gid].users = [];
       }
 
@@ -220,7 +276,9 @@ export default class QQBotService {
     const subscribeUser = async (qid: number, gid: number, mid: number) => {
       let _messages: [string, string] = ["", ""];
 
-      const userInfo = await BiliAccountService.getDefault().getBiliApi().getUserInfo(mid);
+      const userInfo = await BiliAccountService.getDefault()
+        .getBiliApi()
+        .getUserInfo(mid);
 
       const roomId = userInfo.live_room.roomid;
 
@@ -252,7 +310,11 @@ export default class QQBotService {
             `- 等级: Lv${userInfo.level}\n` +
             `- 会员: ${BiliUtils.transformVipType(userInfo.vip.type)}\n` +
             `- 用户ID: ${userInfo.mid}\n` +
-            `- 直播间: ${userInfo.live_room.roomStatus === 0 ? "无" : userInfo.live_room.roomid}\n` +
+            `- 直播间: ${
+              userInfo.live_room.roomStatus === 0
+                ? "无"
+                : userInfo.live_room.roomid
+            }\n` +
             `- 订阅状态:\n` +
             `  - 直播间: ${_messages[0]}\n` +
             `  - 主播动态: ${_messages[1]}`
@@ -345,7 +407,9 @@ export default class QQBotService {
     const initUser = async (mid: number) => {
       let _messages: [string, string] = ["", ""];
 
-      const userInfo = await BiliAccountService.getDefault().getBiliApi().getUserInfo(mid);
+      const userInfo = await BiliAccountService.getDefault()
+        .getBiliApi()
+        .getUserInfo(mid);
 
       const roomId = userInfo.live_room.roomid;
 
@@ -377,7 +441,11 @@ export default class QQBotService {
             `- 等级: Lv${userInfo.level}\n` +
             `- 会员: ${BiliUtils.transformVipType(userInfo.vip.type)}\n` +
             `- 用户ID: ${userInfo.mid}\n` +
-            `- 直播间: ${userInfo.live_room.roomStatus === 0 ? "无" : userInfo.live_room.roomid}\n` +
+            `- 直播间: ${
+              userInfo.live_room.roomStatus === 0
+                ? "无"
+                : userInfo.live_room.roomid
+            }\n` +
             `- 授权状态:\n` +
             `  -${_messages[0]}\n` +
             `  -${_messages[1]}`
@@ -386,7 +454,8 @@ export default class QQBotService {
     };
 
     this.commandProcessor.register(".bn.room", async (args, context) => {
-      if (!Utils.auth(context.event.user_id, 1)) throw new AuthError("权限不足");
+      if (!Utils.auth(context.event.user_id, 1))
+        throw new AuthError("权限不足");
       const liveRoomsConfig = qqBotConfigManager.get("liveRoom");
       const query = new SubscriptionQuery(liveRoomsConfig);
       const rooms = query.getSubscriptions();
@@ -398,7 +467,8 @@ export default class QQBotService {
     });
 
     this.commandProcessor.register(".bn.stop", async (args, context) => {
-      if (!Utils.auth(context.event.user_id, 20)) throw new AuthError("权限不足");
+      if (!Utils.auth(context.event.user_id, 20))
+        throw new AuthError("权限不足");
 
       logger.warn("程序即将结束");
 
@@ -417,7 +487,8 @@ export default class QQBotService {
     });
 
     this.commandProcessor.register(".bn.drop.room", async (args, context) => {
-      if (!Utils.auth(context.event.user_id, 10)) throw new AuthError("权限不足");
+      if (!Utils.auth(context.event.user_id, 10))
+        throw new AuthError("权限不足");
 
       let normal = false;
 
@@ -438,7 +509,8 @@ export default class QQBotService {
 
       for (const _roomId of targetRooms) {
         const roomId = parseInt(_roomId);
-        const recorders = this.liveAutomationManager.getRecordersMapByRoomId(roomId);
+        const recorders =
+          this.liveAutomationManager.getRecordersMapByRoomId(roomId);
 
         if (recorders.size > 0) {
           for (const [hash, _] of recorders) {
@@ -449,7 +521,10 @@ export default class QQBotService {
                 .then(() => context.reply(`录制任务已结束[${hash}]`))
                 .catch((e) => {
                   context.reply(`销毁录制任务[${hash}]失败\n\n${e}`);
-                  notifyEmitter.emit("msg-warn", FormatUtils.formatErrorMessage("DropRecording", e));
+                  notifyEmitter.emit(
+                    "msg-warn",
+                    FormatUtils.formatErrorMessage("DropRecording", e)
+                  );
                 });
             } else {
               this.liveAutomationManager.forceClearRecording(hash, true);
@@ -464,64 +539,80 @@ export default class QQBotService {
       return null;
     });
 
-    this.commandProcessor.register(".bn.drop.recording", async (args, context) => {
-      if (!Utils.auth(context.event.user_id, 10)) throw new AuthError("权限不足");
+    this.commandProcessor.register(
+      ".bn.drop.recording",
+      async (args, context) => {
+        if (!Utils.auth(context.event.user_id, 10))
+          throw new AuthError("权限不足");
 
-      let normal = false;
+        let normal = false;
 
-      if (args[0] === "normal") {
-        normal = true;
-        args = args.slice(1);
-        logger.debug("销毁录制任务 -> 正常模式");
+        if (args[0] === "normal") {
+          normal = true;
+          args = args.slice(1);
+          logger.debug("销毁录制任务 -> 正常模式");
+        }
+
+        logger.info("销毁录制任务 ->", args);
+
+        if (args.length < 1 || !args.every((e) => e.length >= 7)) {
+          return "参数错误，hash 至少七位";
+        }
+
+        const targetHashes = new Set(args);
+        const liveRecorders = this.liveAutomationManager.getLiveRecorders();
+
+        const matchedHashes = Array.from(liveRecorders)
+          .filter(([hash]) =>
+            Array.from(targetHashes).some((targetHash) =>
+              hash.startsWith(targetHash)
+            )
+          )
+          .map(([hash, _]) => hash);
+
+        if (matchedHashes.length > 0) {
+          matchedHashes.forEach((hash) => {
+            const targetHash = Array.from(targetHashes).find((th) =>
+              hash.startsWith(th)
+            );
+
+            logger.info(
+              `已找到指定录制任务，即将销毁 ${hash}, by targetHash -> ${targetHash}`
+            );
+
+            if (normal) {
+              context.reply(`开始提前完成录制任务[${targetHash}]`);
+              this.liveAutomationManager
+                .forceStopRecording(hash, true)
+                .then(() => context.reply(`录制任务已结束[${targetHash}]`))
+                .catch((e) => {
+                  context.reply(`销毁录制任务[${targetHash}]失败\n\n${e}`);
+                  notifyEmitter.emit(
+                    "msg-warn",
+                    FormatUtils.formatErrorMessage("DropRecording", e)
+                  );
+                });
+            } else {
+              this.liveAutomationManager.forceClearRecording(hash, true);
+              context.reply(`已销毁录制任务[${targetHash}]`);
+            }
+          });
+
+          logger.info(`共销毁 ${matchedHashes.length} 个录制任务`);
+        } else {
+          logger.warn("未找到匹配的录制器", {
+            targetHashes: Array.from(targetHashes),
+          });
+          context.reply("未找到匹配的录制器");
+        }
+
+        return null;
       }
-
-      logger.info("销毁录制任务 ->", args);
-
-      if (args.length < 1 || !args.every((e) => e.length >= 7)) {
-        return "参数错误，hash 至少七位";
-      }
-
-      const targetHashes = new Set(args);
-      const liveRecorders = this.liveAutomationManager.getLiveRecorders();
-
-      const matchedHashes = Array.from(liveRecorders)
-        .filter(([hash]) => Array.from(targetHashes).some((targetHash) => hash.startsWith(targetHash)))
-        .map(([hash, _]) => hash);
-
-      if (matchedHashes.length > 0) {
-        matchedHashes.forEach((hash) => {
-          const targetHash = Array.from(targetHashes).find((th) => hash.startsWith(th));
-
-          logger.info(`已找到指定录制任务，即将销毁 ${hash}, by targetHash -> ${targetHash}`);
-
-          if (normal) {
-            context.reply(`开始提前完成录制任务[${targetHash}]`);
-            this.liveAutomationManager
-              .forceStopRecording(hash, true)
-              .then(() => context.reply(`录制任务已结束[${targetHash}]`))
-              .catch((e) => {
-                context.reply(`销毁录制任务[${targetHash}]失败\n\n${e}`);
-                notifyEmitter.emit("msg-warn", FormatUtils.formatErrorMessage("DropRecording", e));
-              });
-          } else {
-            this.liveAutomationManager.forceClearRecording(hash, true);
-            context.reply(`已销毁录制任务[${targetHash}]`);
-          }
-        });
-
-        logger.info(`共销毁 ${matchedHashes.length} 个录制任务`);
-      } else {
-        logger.warn("未找到匹配的录制器", {
-          targetHashes: Array.from(targetHashes),
-        });
-        context.reply("未找到匹配的录制器");
-      }
-
-      return null;
-    });
+    );
 
     this.commandProcessor.register(".bn.sf", async (args, context) => {
-      if (!Utils.auth(context.event.user_id, 10)) throw new AuthError("权限不足");
+      if (!Utils.auth(context.event.user_id, 10))
+        throw new AuthError("权限不足");
       this.Debug_SubscribeFree = true;
       this.Debug_SubscribeFree_Interval = setInterval(() => {
         if (this.liveAutomationManager.getLiveRecorders().size === 0) {
@@ -536,7 +627,9 @@ export default class QQBotService {
 
     this.commandProcessor.register(".bn", async (args, context) => {
       const mainServerHealth = true;
-      const spaceDynamicRenderHealth = await SpaceDynamicRender.health(appConfigManager.get("dynamicRender"));
+      const spaceDynamicRenderHealth = await SpaceDynamicRender.health(
+        appConfigManager.get("dynamicRender")
+      );
 
       // 获取内存使用情况
       const memoryUsage = process.memoryUsage();
@@ -565,9 +658,17 @@ export default class QQBotService {
 
       if (oneClickSubscribe.user) {
         logger.debug("存在用户动态官方群，将直接采用 订阅UP 功能完成一键订阅");
-        return await subscribeUser(context.event.user_id, context.event.group_id, oneClickSubscribe.user);
+        return await subscribeUser(
+          context.event.user_id,
+          context.event.group_id,
+          oneClickSubscribe.user
+        );
       } else if (oneClickSubscribe.room) {
-        return subscribeLiveRoom(context.event.user_id, context.event.group_id, oneClickSubscribe.room);
+        return subscribeLiveRoom(
+          context.event.user_id,
+          context.event.group_id,
+          oneClickSubscribe.room
+        );
       } else {
         return "None";
       }
@@ -576,8 +677,15 @@ export default class QQBotService {
     this.groupCommandProcessor.register("订阅UP", async (args, context) => {
       const users = args;
 
-      if (args.length === 0 && canOneClickSubscribe(context.event.group_id).can) {
-        return [OneBotMessageUtils.Text("本群为官方群聊，您可以\n使用 '一键订阅' 命令来完成订阅")];
+      if (
+        args.length === 0 &&
+        canOneClickSubscribe(context.event.group_id).can
+      ) {
+        return [
+          OneBotMessageUtils.Text(
+            "本群为官方群聊，您可以\n使用 '一键订阅' 命令来完成订阅"
+          ),
+        ];
       }
 
       if (args.length < 1 || !users.every((e) => parseInt(e) > 0)) {
@@ -587,7 +695,13 @@ export default class QQBotService {
       const messages: SegmentMessages = [];
 
       for (let user of users) {
-        messages.push(...(await subscribeUser(context.event.user_id, context.event.group_id, parseInt(user))));
+        messages.push(
+          ...(await subscribeUser(
+            context.event.user_id,
+            context.event.group_id,
+            parseInt(user)
+          ))
+        );
       }
 
       return messages.intersperse(OneBotMessageUtils.Text("\n\n"));
@@ -596,8 +710,15 @@ export default class QQBotService {
     this.groupCommandProcessor.register("订阅直播间", async (args, context) => {
       const rooms = args;
 
-      if (args.length === 0 && !!canOneClickSubscribe(context.event.group_id).room) {
-        return [OneBotMessageUtils.Text("本群为官方群聊，您可以\n使用 '一键订阅' 命令来完成订阅")];
+      if (
+        args.length === 0 &&
+        !!canOneClickSubscribe(context.event.group_id).room
+      ) {
+        return [
+          OneBotMessageUtils.Text(
+            "本群为官方群聊，您可以\n使用 '一键订阅' 命令来完成订阅"
+          ),
+        ];
       }
 
       if (args.length < 1 || !rooms.every((e) => parseInt(e) > 0)) {
@@ -610,7 +731,11 @@ export default class QQBotService {
         const roomId = parseInt(_roomId);
 
         try {
-          const msg = subscribeLiveRoom(context.event.user_id, context.event.group_id, roomId);
+          const msg = subscribeLiveRoom(
+            context.event.user_id,
+            context.event.group_id,
+            roomId
+          );
           messages.push(rooms.length !== 1 ? `${roomId} ${msg}` : msg);
         } catch (e) {
           const err = e as string;
@@ -621,37 +746,60 @@ export default class QQBotService {
       return messages.join("\n");
     });
 
-    this.groupCommandProcessor.register("订阅主播动态", async (args, context) => {
-      const users = args;
+    this.groupCommandProcessor.register(
+      "订阅主播动态",
+      async (args, context) => {
+        const users = args;
 
-      if (args.length === 0 && !!canOneClickSubscribe(context.event.group_id).user) {
-        return [OneBotMessageUtils.Text("本群为官方群聊，您可以\n使用 '一键订阅' 命令来完成订阅\n\n或者: 订阅主播动态 [用户ID...]")];
-      }
-
-      if (args.length < 1 || !users.every((e) => parseInt(e) > 0)) {
-        return [OneBotMessageUtils.Text("订阅主播动态 [用户ID...]" + "查询UP主用户ID可以使用\n" + "'查询主播 [主播名]' 命令")];
-      }
-
-      const messages: string[] = [];
-
-      for (let _userId of users) {
-        const mid = parseInt(_userId);
-
-        try {
-          const msg = subscribeUserDynamic(context.event.user_id, context.event.group_id, mid);
-          messages.push(users.length !== 1 ? `${mid} ${msg}` : msg);
-        } catch (e) {
-          const err = e as string;
-          messages.push(users.length !== 1 ? `${mid} ${err}` : err);
+        if (
+          args.length === 0 &&
+          !!canOneClickSubscribe(context.event.group_id).user
+        ) {
+          return [
+            OneBotMessageUtils.Text(
+              "本群为官方群聊，您可以\n使用 '一键订阅' 命令来完成订阅\n\n或者: 订阅主播动态 [用户ID...]"
+            ),
+          ];
         }
-      }
 
-      return messages.join("\n");
-    });
+        if (args.length < 1 || !users.every((e) => parseInt(e) > 0)) {
+          return [
+            OneBotMessageUtils.Text(
+              "订阅主播动态 [用户ID...]" +
+                "查询UP主用户ID可以使用\n" +
+                "'查询主播 [主播名]' 命令"
+            ),
+          ];
+        }
+
+        const messages: string[] = [];
+
+        for (let _userId of users) {
+          const mid = parseInt(_userId);
+
+          try {
+            const msg = subscribeUserDynamic(
+              context.event.user_id,
+              context.event.group_id,
+              mid
+            );
+            messages.push(users.length !== 1 ? `${mid} ${msg}` : msg);
+          } catch (e) {
+            const err = e as string;
+            messages.push(users.length !== 1 ? `${mid} ${err}` : err);
+          }
+        }
+
+        return messages.join("\n");
+      }
+    );
 
     this.groupCommandProcessor.register("直播间", async (args, context) => {
       const query = new SubscriptionQuery(qqBotConfigManager.get("liveRoom"));
-      const rooms = query.getUserGroupSubscriptions(context.event.user_id, context.event.group_id);
+      const rooms = query.getUserGroupSubscriptions(
+        context.event.user_id,
+        context.event.group_id
+      );
 
       if (rooms.length == 0) {
         return "您在本群暂无订阅";
@@ -664,7 +812,10 @@ export default class QQBotService {
         const roomInfo = await biliApi.getLiveRoomInfo(_roomId);
 
         try {
-          const liveStatusMessages = await Utils.renderLiveStatusTemplate(roomInfo, "-");
+          const liveStatusMessages = await Utils.renderLiveStatusTemplate(
+            roomInfo,
+            "-"
+          );
 
           logger.debug("渲染完成 ✅ -> ", _roomId);
 
@@ -680,7 +831,10 @@ export default class QQBotService {
 
     this.groupCommandProcessor.register("投稿进度", async (args, context) => {
       const query = new SubscriptionQuery(qqBotConfigManager.get("liveRoom"));
-      const rooms = query.getUserGroupSubscriptions(context.event.user_id, context.event.group_id);
+      const rooms = query.getUserGroupSubscriptions(
+        context.event.user_id,
+        context.event.group_id
+      );
 
       if (rooms.length == 0) {
         return "您在本群暂无订阅";
@@ -692,7 +846,8 @@ export default class QQBotService {
       for (let _roomId of rooms) {
         index++;
         const roomId = parseInt(_roomId);
-        const uploaders = this.liveAutomationManager.getUploadersMapByRoomId(roomId);
+        const uploaders =
+          this.liveAutomationManager.getUploadersMapByRoomId(roomId);
 
         result.push(OneBotMessageUtils.Text(`直播间${_roomId} 投稿器列表:`));
         if (uploaders.size === 0) {
@@ -703,7 +858,9 @@ export default class QQBotService {
         uploaders.forEach((uploader, hash) => {
           const tasks = uploader.getTasks();
 
-          result.push(OneBotMessageUtils.Text(`投稿器 ${hash.substring(0, 7)}:`));
+          result.push(
+            OneBotMessageUtils.Text(`投稿器 ${hash.substring(0, 7)}:`)
+          );
 
           tasks.forEach((videoTask, index) => {
             const videoName = index === 0 ? "主投稿" : `视频 ${index}`;
@@ -718,7 +875,13 @@ export default class QQBotService {
                     .map((task, index) => {
                       return (
                         `- ${task.name}\n` +
-                        `  - 状态: ${task.status === "success" ? "成功 ✅" : task.status === "error" ? "失败 ❌" : "操作 ⌛️"}\n` +
+                        `  - 状态: ${
+                          task.status === "success"
+                            ? "成功 ✅"
+                            : task.status === "error"
+                            ? "失败 ❌"
+                            : "操作 ⌛️"
+                        }\n` +
                         `  - 信息: ${task.message || "无"}\n` +
                         `  - 进度: ${task.process || "无"}\n` +
                         `  - 耗时: ${task.duration || "未知"}`
@@ -737,7 +900,10 @@ export default class QQBotService {
 
     this.groupCommandProcessor.register("录制状态", async (args, context) => {
       const query = new SubscriptionQuery(qqBotConfigManager.get("liveRoom"));
-      const rooms = query.getUserGroupSubscriptions(context.event.user_id, context.event.group_id);
+      const rooms = query.getUserGroupSubscriptions(
+        context.event.user_id,
+        context.event.group_id
+      );
 
       if (rooms.length == 0) {
         return "您在本群暂无订阅";
@@ -749,7 +915,8 @@ export default class QQBotService {
       for (let _roomId of rooms) {
         index++;
         const roomId = parseInt(_roomId);
-        const recorders = this.liveAutomationManager.getRecordersMapByRoomId(roomId);
+        const recorders =
+          this.liveAutomationManager.getRecordersMapByRoomId(roomId);
 
         result.push(OneBotMessageUtils.Text(`直播间${_roomId} 录制器列表:`));
         if (recorders.size === 0) {
@@ -762,7 +929,9 @@ export default class QQBotService {
           result.push(
             OneBotMessageUtils.Text(
               `录制器 ${hash.substring(0, 7)}\n` +
-                `- 录制状态: ${recorder.isRunning() ? "运行中 🟢" : "未运行 🔴"}\n` +
+                `- 录制状态: ${
+                  recorder.isRunning() ? "运行中 🟢" : "未运行 🔴"
+                }\n` +
                 `- 录制分段: ${recorder.getSegmentFilesCount()}\n` +
                 `- 录制时长: ${stats.ffmpegStats?.time || "未知"}\n` +
                 `- 录制帧率: ${stats.ffmpegStats?.fps || "未知"}\n` +
@@ -778,7 +947,10 @@ export default class QQBotService {
 
     this.groupCommandProcessor.register("直播间图片", async (args, context) => {
       const query = new SubscriptionQuery(qqBotConfigManager.get("liveRoom"));
-      const rooms = query.getUserGroupSubscriptions(context.event.user_id, context.event.group_id);
+      const rooms = query.getUserGroupSubscriptions(
+        context.event.user_id,
+        context.event.group_id
+      );
 
       if (rooms.length == 0) {
         return "您在本群暂无订阅";
@@ -796,14 +968,21 @@ export default class QQBotService {
 
         if (roomInfo.live_status !== LiveRoomStatus.LIVE) {
           result.push(
-            OneBotMessageUtils.Text(`${roomInfo.title}\n` + `- 直播间ID: ${roomId}\n` + `- 未在直播 🔴` + `${index !== rooms.length ? "\n\n" : ""}`)
+            OneBotMessageUtils.Text(
+              `${roomInfo.title}\n` +
+                `- 直播间ID: ${roomId}\n` +
+                `- 未在直播 🔴` +
+                `${index !== rooms.length ? "\n\n" : ""}`
+            )
           );
 
           continue;
         }
 
         if (rooms.length !== 1) {
-          result.push(OneBotMessageUtils.Text(`${roomInfo.title}\n直播间ID: ${roomId}\n`));
+          result.push(
+            OneBotMessageUtils.Text(`${roomInfo.title}\n直播间ID: ${roomId}\n`)
+          );
         }
 
         const base64 = await screenshotSync(roomId, biliApi);
@@ -819,8 +998,36 @@ export default class QQBotService {
       return result;
     });
 
+    this.groupCommandProcessor.register("重新投稿", async (args, context) => {
+      if (!Utils.auth(context.event.user_id, 10))
+        throw new AuthError("权限不足");
+
+      if (args.length !== 1 || parseInt(args[0]) < 0) {
+        return "设置UP官群 [UP主ID]";
+      }
+
+      logger.debug("开始重新投稿");
+
+      this.liveAutomationManager
+        .retryUpload(args[0])
+        .then((resp) => {
+          if (resp === null) {
+            context.reply("未找到失败的投稿任务", {
+              reference: true,
+            });
+          }
+          logger.info("重新投稿成功✅", resp);
+        })
+        .catch((e) => {
+          logger.error("重新投稿失败❌", e);
+        });
+
+      return "已重启投稿✅";
+    });
+
     this.groupCommandProcessor.register("设置UP官群", async (args, context) => {
-      if (!Utils.auth(context.event.user_id, 10)) throw new AuthError("权限不足");
+      if (!Utils.auth(context.event.user_id, 10))
+        throw new AuthError("权限不足");
 
       if (args.length !== 1 || parseInt(args[0]) < 0) {
         return "设置UP官群 [UP主ID]";
@@ -837,9 +1044,14 @@ export default class QQBotService {
 
       const mid = parseInt(args[0]);
 
-      const userInfo = await BiliAccountService.getDefault().getBiliApi().getUserInfo(mid);
+      const userInfo = await BiliAccountService.getDefault()
+        .getBiliApi()
+        .getUserInfo(mid);
 
-      if (userInfo.live_room.roomStatus === 0 || userInfo.live_room.roomid <= 0) {
+      if (
+        userInfo.live_room.roomStatus === 0 ||
+        userInfo.live_room.roomid <= 0
+      ) {
         messages[0] = "该主播无直播间";
       } else {
         const roomId = userInfo.live_room.roomid;
@@ -900,7 +1112,11 @@ export default class QQBotService {
             `- 等级: Lv${userInfo.level}\n` +
             `- 会员: ${BiliUtils.transformVipType(userInfo.vip.type)}\n` +
             `- 用户ID: ${userInfo.mid}\n` +
-            `- 直播间: ${userInfo.live_room.roomStatus === 0 ? "无" : userInfo.live_room.roomid}\n` +
+            `- 直播间: ${
+              userInfo.live_room.roomStatus === 0
+                ? "无"
+                : userInfo.live_room.roomid
+            }\n` +
             `- 设置结果:\n` +
             `  - 直播间: ${messages[0]}\n` +
             `  - 主播动态: ${messages[1]}`
@@ -909,7 +1125,8 @@ export default class QQBotService {
     });
 
     this.commandProcessor.register("授权直播间", async (args, context) => {
-      if (!Utils.auth(context.event.user_id, 10)) throw new AuthError("权限不足");
+      if (!Utils.auth(context.event.user_id, 10))
+        throw new AuthError("权限不足");
 
       const rooms = args;
 
@@ -935,7 +1152,8 @@ export default class QQBotService {
     });
 
     this.commandProcessor.register("授权主播动态", async (args, context) => {
-      if (!Utils.auth(context.event.user_id, 10)) throw new AuthError("权限不足");
+      if (!Utils.auth(context.event.user_id, 10))
+        throw new AuthError("权限不足");
 
       const users = args;
 
@@ -961,7 +1179,8 @@ export default class QQBotService {
     });
 
     this.commandProcessor.register("授权UP主", async (args, context) => {
-      if (!Utils.auth(context.event.user_id, 10)) throw new AuthError("权限不足");
+      if (!Utils.auth(context.event.user_id, 10))
+        throw new AuthError("权限不足");
 
       const users = args;
 
@@ -975,7 +1194,8 @@ export default class QQBotService {
     });
 
     this.commandProcessor.register("解约直播间", async (args, context) => {
-      if (!Utils.auth(context.event.user_id, 10)) throw new AuthError("权限不足");
+      if (!Utils.auth(context.event.user_id, 10))
+        throw new AuthError("权限不足");
 
       const rooms = args;
 
@@ -1010,14 +1230,17 @@ export default class QQBotService {
 
         logger.info(`直播间 -> liveAutomationManager.removeRoom`);
 
-        messages.push(rooms.length == 1 ? "删除成功 ✅" : `${roomId} 删除成功 ✅`);
+        messages.push(
+          rooms.length == 1 ? "删除成功 ✅" : `${roomId} 删除成功 ✅`
+        );
       }
 
       return messages.join("\n");
     });
 
     this.commandProcessor.register("解约用户动态", async (args, context) => {
-      if (!Utils.auth(context.event.user_id, 10)) throw new AuthError("权限不足");
+      if (!Utils.auth(context.event.user_id, 10))
+        throw new AuthError("权限不足");
 
       const users = args;
 
@@ -1059,12 +1282,19 @@ export default class QQBotService {
     });
 
     this.commandProcessor.register("添加账号", async (args, context) => {
-      if (!Utils.auth(context.event.user_id, 2)) throw new AuthError("权限不足");
+      if (!Utils.auth(context.event.user_id, 2))
+        throw new AuthError("权限不足");
 
       loginAccount({
         isDefaultAccount: false,
         qrcodeCallback: (url, base64) => {
-          context.reply([OneBotMessageUtils.Text("请扫描二维码登陆\n"), OneBotMessageUtils.Base64Image(base64)], { reference: true });
+          context.reply(
+            [
+              OneBotMessageUtils.Text("请扫描二维码登陆\n"),
+              OneBotMessageUtils.Base64Image(base64),
+            ],
+            { reference: true }
+          );
         },
       })
         .then(async (userAccount) => {
@@ -1076,7 +1306,9 @@ export default class QQBotService {
               "添加成功 ✅\n\n" +
                 `用户昵称: ${accountInfo.uname}\n` +
                 `用户ID: ${userAccount.getUid()}\n` +
-                (accountInfo.vip_label.text ? `会员: ${accountInfo.vip_label.text}\n` : "") +
+                (accountInfo.vip_label.text
+                  ? `会员: ${accountInfo.vip_label.text}\n`
+                  : "") +
                 `等级: Lv${accountInfo.level_info.current_level}`
             ),
           ]);
@@ -1091,9 +1323,11 @@ export default class QQBotService {
     this.commandProcessor.register("添加管理员", async (args, context) => {
       const qid = parseInt(args[0]);
       const perm = parseInt(args[1]);
-      if (args.length !== 2 || qid <= 0 || perm <= 0 || perm > 100) return "添加管理员 [QQ] [Perm]";
+      if (args.length !== 2 || qid <= 0 || perm <= 0 || perm > 100)
+        return "添加管理员 [QQ] [Perm]";
 
-      if (!Utils.auth(context.event.user_id, Math.max(5, parseInt(args[1])))) throw new AuthError("权限不足");
+      if (!Utils.auth(context.event.user_id, Math.max(5, parseInt(args[1]))))
+        throw new AuthError("权限不足");
 
       const adminsConfig = qqBotConfigManager.get("admins");
 
@@ -1101,7 +1335,10 @@ export default class QQBotService {
       if (adminsConfig[args[0]]) {
         adminsConfig[args[0]].permission = parseInt(args[1]);
 
-        result = perm >= adminsConfig[args[0]].permission ? "提升成功 ✅" : "降级成功 ✅";
+        result =
+          perm >= adminsConfig[args[0]].permission
+            ? "提升成功 ✅"
+            : "降级成功 ✅";
       } else {
         adminsConfig[args[0]] = {
           permission: perm,
@@ -1126,161 +1363,214 @@ export default class QQBotService {
       logger.debug(`热装载 LiveRecorder 监听器`);
       this.installLiveRecorderEventListeners(liveRecorder, hash);
     });
-    this.liveAutomationManager.on("new-uploader", (videoUploader, hash, roomId) => {
-      logger.debug(`收到新的投稿器, 热装载 VideoUploader 监听器`);
-      this.installVideoUploaderEventListeners(videoUploader, hash, roomId);
-    });
+    this.liveAutomationManager.on(
+      "new-uploader",
+      (videoUploader, hash, roomId) => {
+        logger.debug(`收到新的投稿器, 热装载 VideoUploader 监听器`);
+        this.installVideoUploaderEventListeners(videoUploader, hash, roomId);
+      }
+    );
   }
 
   private installLiveAutomationManagerEventListeners() {
-    this.liveAutomationManager.on("live-start", async ({ roomId, hash: liveHash, roomInfo, isFirst }) => {
-      logger.debug(
-        `收到 liveAutomationManager 开始直播(live-start)🟢 事件 -> live-start, roomId: ${roomId}, liveHash: ${liveHash}, isFirst: ${isFirst}`
-      );
+    this.liveAutomationManager.on(
+      "live-start",
+      async ({ roomId, hash: liveHash, roomInfo, isFirst }) => {
+        logger.debug(
+          `收到 liveAutomationManager 开始直播(live-start)🟢 事件 -> live-start, roomId: ${roomId}, liveHash: ${liveHash}, isFirst: ${isFirst}`
+        );
 
-      if (isFirst) {
-        logger.info(`房间 ${roomId} 为首次直播状态通知，跳过QQ直播通知`);
-        return;
-      }
+        if (isFirst) {
+          logger.info(`房间 ${roomId} 为首次直播状态通知，跳过QQ直播通知`);
+          return;
+        }
 
-      const liveRoomsConfig = qqBotConfigManager.get("liveRoom");
-      const roomConfig = liveRoomsConfig[roomId.toString()];
-      const query = new SubscriptionQuery(liveRoomsConfig);
+        const liveRoomsConfig = qqBotConfigManager.get("liveRoom");
+        const roomConfig = liveRoomsConfig[roomId.toString()];
+        const query = new SubscriptionQuery(liveRoomsConfig);
 
-      if (!roomConfig) {
-        logger.warn(`直播间 ${roomId} 配置不存在或未配置`);
-        return;
-      }
-      if (!roomConfig.notify) {
-        logger.debug(`直播间 ${roomId} 通知已禁用！`);
-        return;
-      }
+        if (!roomConfig) {
+          logger.warn(`直播间 ${roomId} 配置不存在或未配置`);
+          return;
+        }
+        if (!roomConfig.notify) {
+          logger.debug(`直播间 ${roomId} 通知已禁用！`);
+          return;
+        }
 
-      const notifyGroups = roomConfig.group || {};
+        const notifyGroups = roomConfig.group || {};
 
-      if (Object.keys(notifyGroups).length === 0) {
-        logger.debug(`直播间 ${roomId} 无群组订阅, 跳过通知`);
-      } else {
-        const liveStatusMessages = await Utils.renderLiveStartTemplate(roomInfo, liveHash);
+        if (Object.keys(notifyGroups).length === 0) {
+          logger.debug(`直播间 ${roomId} 无群组订阅, 跳过通知`);
+        } else {
+          const liveStatusMessages = await Utils.renderLiveStartTemplate(
+            roomInfo,
+            liveHash
+          );
 
-        // logger.debug("渲染完成 ✅");
+          // logger.debug("渲染完成 ✅");
 
-        Object.entries(notifyGroups).forEach(async ([_gid, group]) => {
-          const gid = parseInt(_gid);
+          Object.entries(notifyGroups).forEach(async ([_gid, group]) => {
+            const gid = parseInt(_gid);
 
-          if (!this.bot) {
-            logger.error("机器人实例对象不存在！");
-            return;
-          }
+            if (!this.bot) {
+              logger.error("机器人实例对象不存在！");
+              return;
+            }
 
-          let shouldAtAll = false;
-          try {
-            const botUid = this.bot.getQID();
-
-            shouldAtAll =
-              query.isOfficialGroup(roomId, gid) && ["admin", "owner"].includes((await this.bot.getGroupMemberInfo(gid, botUid)).data.role);
-          } catch (e) {
-            logger.warn(`判断是否需要At全体时出错:`, e);
-          }
-
-          let atSegmentMessage: SegmentMessage[] = [];
-          let unavailableGroupUserArr: number[] = [];
-
-          if (shouldAtAll) {
-            logger.debug("需要At全体");
-            atSegmentMessage = [OneBotMessageUtils.At("all")];
-          } else {
-            const targetUserArr = group.users;
-
-            logger.info("通知用户组检查 -> 开始校验有效用户列表");
-
-            let actualGroupMemberSet = new Set();
-
+            let shouldAtAll = false;
             try {
-              const memberResult = await this.bot.getGroupMemberList(gid);
-              actualGroupMemberSet = new Set(memberResult.data.map((e) => e.user_id));
-            } catch (error) {
-              logger.error("通知用户组检查 -> 获取群成员列表失败", error);
+              const botUid = this.bot.getQID();
+
+              shouldAtAll =
+                query.isOfficialGroup(roomId, gid) &&
+                ["admin", "owner"].includes(
+                  (await this.bot.getGroupMemberInfo(gid, botUid)).data.role
+                );
+            } catch (e) {
+              logger.warn(`判断是否需要At全体时出错:`, e);
             }
 
-            const availableGroupUserArr = targetUserArr.filter((e) => actualGroupMemberSet.has(e));
+            let atSegmentMessage: SegmentMessage[] = [];
+            let unavailableGroupUserArr: number[] = [];
 
-            unavailableGroupUserArr = targetUserArr.filter((e) => !actualGroupMemberSet.has(e));
-
-            if (availableGroupUserArr.length < targetUserArr.length) {
-              logger.warn("通知用户组检查 -> 检测到不可用的用户 ->", unavailableGroupUserArr);
-              logger.warn("通知用户组检查 -> 即将更新配置文件");
-
-              roomConfig.group[gid].users = availableGroupUserArr;
-              qqBotConfigManager.set("liveRoom", liveRoomsConfig);
-              logger.info(`通知用户组检查 -> 已设置 ${gid} 的最新配置✅`);
+            if (shouldAtAll) {
+              logger.debug("需要At全体");
+              atSegmentMessage = [OneBotMessageUtils.At("all")];
             } else {
-              logger.info("通知用户组检查 -> 检测通过，均为存在用户✅");
+              const targetUserArr = group.users;
+
+              logger.info("通知用户组检查 -> 开始校验有效用户列表");
+
+              let actualGroupMemberSet = new Set();
+
+              try {
+                const memberResult = await this.bot.getGroupMemberList(gid);
+                actualGroupMemberSet = new Set(
+                  memberResult.data.map((e) => e.user_id)
+                );
+              } catch (error) {
+                logger.error("通知用户组检查 -> 获取群成员列表失败", error);
+              }
+
+              const availableGroupUserArr = targetUserArr.filter((e) =>
+                actualGroupMemberSet.has(e)
+              );
+
+              unavailableGroupUserArr = targetUserArr.filter(
+                (e) => !actualGroupMemberSet.has(e)
+              );
+
+              if (availableGroupUserArr.length < targetUserArr.length) {
+                logger.warn(
+                  "通知用户组检查 -> 检测到不可用的用户 ->",
+                  unavailableGroupUserArr
+                );
+                logger.warn("通知用户组检查 -> 即将更新配置文件");
+
+                roomConfig.group[gid].users = availableGroupUserArr;
+                qqBotConfigManager.set("liveRoom", liveRoomsConfig);
+                logger.info(`通知用户组检查 -> 已设置 ${gid} 的最新配置✅`);
+              } else {
+                logger.info("通知用户组检查 -> 检测通过，均为存在用户✅");
+              }
+
+              atSegmentMessage = availableGroupUserArr.map((qq) => {
+                return OneBotMessageUtils.At(qq);
+              });
             }
 
-            atSegmentMessage = availableGroupUserArr.map((qq) => {
-              return OneBotMessageUtils.At(qq);
-            });
-          }
+            await this.bot.sendGroup(gid, liveStatusMessages);
 
-          await this.bot.sendGroup(gid, liveStatusMessages);
-
-          await this.bot.sendGroup(gid, [OneBotMessageUtils.Text("您订阅的直播间开始直播啦\n"), ...atSegmentMessage]);
-
-          logger.debug(`群聊通知完成✅ -> Group ${gid}, 通知用户数: ${atSegmentMessage.length}`);
-
-          if (unavailableGroupUserArr.length > 0) {
             await this.bot.sendGroup(gid, [
-              OneBotMessageUtils.Text(`警告：已删除 ${unavailableGroupUserArr.length} 个不可用的用户\n\n${unavailableGroupUserArr.join(", ")}`),
+              OneBotMessageUtils.Text("您订阅的直播间开始直播啦\n"),
+              ...atSegmentMessage,
             ]);
-          }
-        });
+
+            logger.debug(
+              `群聊通知完成✅ -> Group ${gid}, 通知用户数: ${atSegmentMessage.length}`
+            );
+
+            if (unavailableGroupUserArr.length > 0) {
+              await this.bot.sendGroup(gid, [
+                OneBotMessageUtils.Text(
+                  `警告：已删除 ${
+                    unavailableGroupUserArr.length
+                  } 个不可用的用户\n\n${unavailableGroupUserArr.join(", ")}`
+                ),
+              ]);
+            }
+          });
+        }
       }
-    });
+    );
 
-    this.liveAutomationManager.on("live-end", async ({ roomId, hash: liveHash, liveStartRoomInfo, liveEndRoomInfo, liveDuration, isFirst }) => {
-      logger.debug(`收到 liveAutomationManager 结束直播(live-end)🔴 事件, roomId: ${roomId}, liveHash: ${liveHash}, isFirst: ${isFirst}`);
+    this.liveAutomationManager.on(
+      "live-end",
+      async ({
+        roomId,
+        hash: liveHash,
+        liveStartRoomInfo,
+        liveEndRoomInfo,
+        liveDuration,
+        isFirst,
+      }) => {
+        logger.debug(
+          `收到 liveAutomationManager 结束直播(live-end)🔴 事件, roomId: ${roomId}, liveHash: ${liveHash}, isFirst: ${isFirst}`
+        );
 
-      if (isFirst) {
-        logger.info(`房间 ${roomId} 为首次直播状态通知，跳过QQ直播通知`);
-        return;
+        if (isFirst) {
+          logger.info(`房间 ${roomId} 为首次直播状态通知，跳过QQ直播通知`);
+          return;
+        }
+
+        const liveRoomConfig =
+          qqBotConfigManager.get("liveRoom")[roomId.toString()];
+
+        if (!liveRoomConfig) {
+          logger.warn(`直播间 ${roomId} 配置不存在或未配置`);
+          return;
+        }
+        if (!liveRoomConfig.notify) {
+          logger.debug(`直播间 ${roomId} 通知已禁用！`);
+          return;
+        }
+
+        const notifyGroups = liveRoomConfig.group || {};
+
+        if (Object.keys(notifyGroups).length === 0) {
+          logger.debug(`直播间 ${roomId} 无群组订阅, 跳过通知`);
+        } else {
+          const liveStatusMessages = await Utils.renderLiveEndTemplate({
+            liveStartRoomInfo,
+            liveEndRoomInfo,
+            liveHash,
+            liveDuration,
+          });
+
+          Object.entries(notifyGroups).forEach(async ([gid, group]) => {
+            if (!this.bot) {
+              logger.error("机器人实例对象不存在！");
+              return;
+            }
+
+            await this.bot.sendGroup(parseInt(gid), liveStatusMessages);
+
+            await this.bot.sendGroup(parseInt(gid), [
+              OneBotMessageUtils.Text("您订阅的直播间已经结束直播啦"),
+            ]);
+
+            logger.debug(`群聊通知完成✅ -> Group ${gid}`);
+          });
+        }
       }
-
-      const liveRoomConfig = qqBotConfigManager.get("liveRoom")[roomId.toString()];
-
-      if (!liveRoomConfig) {
-        logger.warn(`直播间 ${roomId} 配置不存在或未配置`);
-        return;
-      }
-      if (!liveRoomConfig.notify) {
-        logger.debug(`直播间 ${roomId} 通知已禁用！`);
-        return;
-      }
-
-      const notifyGroups = liveRoomConfig.group || {};
-
-      if (Object.keys(notifyGroups).length === 0) {
-        logger.debug(`直播间 ${roomId} 无群组订阅, 跳过通知`);
-      } else {
-        const liveStatusMessages = await Utils.renderLiveEndTemplate({ liveStartRoomInfo, liveEndRoomInfo, liveHash, liveDuration });
-
-        Object.entries(notifyGroups).forEach(async ([gid, group]) => {
-          if (!this.bot) {
-            logger.error("机器人实例对象不存在！");
-            return;
-          }
-
-          await this.bot.sendGroup(parseInt(gid), liveStatusMessages);
-
-          await this.bot.sendGroup(parseInt(gid), [OneBotMessageUtils.Text("您订阅的直播间已经结束直播啦")]);
-
-          logger.debug(`群聊通知完成✅ -> Group ${gid}`);
-        });
-      }
-    });
+    );
   }
 
-  private installLiveRecorderEventListeners(liveRecorder: LiveRecorder, hash: string) {
+  private installLiveRecorderEventListeners(
+    liveRecorder: LiveRecorder,
+    hash: string
+  ) {
     liveRecorder.on("start", () => {});
     liveRecorder.on("end", (duration) => {});
     liveRecorder.on("err", (error) => {});
@@ -1288,7 +1578,9 @@ export default class QQBotService {
 
   private installDynamicAutomationManagerEventListeners() {
     this.dynamicAutomationManager.on("new-dynamic", (mid, dynamicId, card) => {
-      logger.debug(`收到 spaceDynamicMonitor 的事件 -> new, mid: ${mid}, dynamicId: ${dynamicId}`);
+      logger.debug(
+        `收到 spaceDynamicMonitor 的事件 -> new, mid: ${mid}, dynamicId: ${dynamicId}`
+      );
 
       // if ([].includes(dynamic.type)) {
       //   logger.info(`收到直播通知类型动态，跳过通知`);
@@ -1331,7 +1623,10 @@ export default class QQBotService {
 
           shouldAtAll = !botUid
             ? false
-            : query.isOfficialGroup(mid, gid) && ["admin", "owner"].includes((await this.bot.getGroupMemberInfo(gid, botUid)).data.role);
+            : query.isOfficialGroup(mid, gid) &&
+              ["admin", "owner"].includes(
+                (await this.bot.getGroupMemberInfo(gid, botUid)).data.role
+              );
         } catch (e) {
           logger.warn(`判断是否需要At全体时出错:`, e);
         }
@@ -1350,17 +1645,26 @@ export default class QQBotService {
 
           try {
             const memberResult = await this.bot.getGroupMemberList(gid);
-            actualGroupMemberSet = new Set(memberResult.data.map((e) => e.user_id));
+            actualGroupMemberSet = new Set(
+              memberResult.data.map((e) => e.user_id)
+            );
           } catch (error) {
             logger.error("通知用户组检查 -> 获取群成员列表失败", error);
           }
 
-          const availableGroupUserArr = targetUserArr.filter((e) => actualGroupMemberSet.has(e));
+          const availableGroupUserArr = targetUserArr.filter((e) =>
+            actualGroupMemberSet.has(e)
+          );
 
-          unavailableGroupUserArr = targetUserArr.filter((e) => !actualGroupMemberSet.has(e));
+          unavailableGroupUserArr = targetUserArr.filter(
+            (e) => !actualGroupMemberSet.has(e)
+          );
 
           if (availableGroupUserArr.length < targetUserArr.length) {
-            logger.warn("通知用户组检查 -> 检测到不可用的用户 ->", unavailableGroupUserArr);
+            logger.warn(
+              "通知用户组检查 -> 检测到不可用的用户 ->",
+              unavailableGroupUserArr
+            );
             logger.warn("通知用户组检查 -> 即将更新配置文件");
 
             userConfig.group[gid].users = availableGroupUserArr;
@@ -1378,15 +1682,25 @@ export default class QQBotService {
         await this.bot.sendGroup(gid, await Utils.renderNewDynamic(card));
 
         await this.bot.sendGroup(gid, [
-          OneBotMessageUtils.Text(`UP发布新动态啦\n发布于: ${FormatUtils.formatTimeAgo(Date.now() - card.desc.timestamp * 1000)}\n\n`),
+          OneBotMessageUtils.Text(
+            `UP发布新动态啦\n发布于: ${FormatUtils.formatTimeAgo(
+              Date.now() - card.desc.timestamp * 1000
+            )}\n\n`
+          ),
           ...atSegmentMessage,
         ]);
 
-        logger.debug(`群聊通知完成✅ -> Group ${gid}, 通知用户数: ${atSegmentMessage.length}`);
+        logger.debug(
+          `群聊通知完成✅ -> Group ${gid}, 通知用户数: ${atSegmentMessage.length}`
+        );
 
         if (unavailableGroupUserArr.length > 0) {
           await this.bot.sendGroup(gid, [
-            OneBotMessageUtils.Text(`警告：已删除 ${unavailableGroupUserArr.length} 个不可用的用户\n\n${unavailableGroupUserArr.join(", ")}`),
+            OneBotMessageUtils.Text(
+              `警告：已删除 ${
+                unavailableGroupUserArr.length
+              } 个不可用的用户\n\n${unavailableGroupUserArr.join(", ")}`
+            ),
           ]);
         }
       });
@@ -1396,11 +1710,19 @@ export default class QQBotService {
   private installVideoUploaderEventListeners(
     videoUploader: VideoUploader,
     hash: string,
-    { file, roomInfo, live, recorder, userCard, additionalDesc }: UploadEventOptions
+    {
+      file,
+      roomInfo,
+      live,
+      recorder,
+      userCard,
+      additionalDesc,
+    }: UploadEventOptions
   ) {
     const roomId = roomInfo.room_id;
 
-    const liveRoomConfig = qqBotConfigManager.get("liveRoom")[roomId.toString()];
+    const liveRoomConfig =
+      qqBotConfigManager.get("liveRoom")[roomId.toString()];
     if (!liveRoomConfig) {
       logger.debug(`直播间 ${roomId} 配置不存在或未配置`);
       return;
@@ -1425,7 +1747,9 @@ export default class QQBotService {
             `录播开始投稿\n` +
               `hash: ${hash.substring(0, 7)}\n` +
               (additionalDesc ? `${additionalDesc}\n\n` : `\n`) +
-              `录制时长: ${FormatUtils.formatDurationWithoutSeconds(recorder.duration)}`
+              `录制时长: ${FormatUtils.formatDurationWithoutSeconds(
+                recorder.duration
+              )}`
           ),
         ]);
 
@@ -1434,7 +1758,8 @@ export default class QQBotService {
     }
 
     videoUploader.on("done", (uploadVideoInfo) => {
-      const liveRoomConfig = qqBotConfigManager.get("liveRoom")[roomId.toString()];
+      const liveRoomConfig =
+        qqBotConfigManager.get("liveRoom")[roomId.toString()];
 
       if (!liveRoomConfig) {
         logger.debug(`直播间 ${roomId} 配置不存在或未配置`);
@@ -1459,8 +1784,12 @@ export default class QQBotService {
             OneBotMessageUtils.Text(
               `录播投稿完成，等待转码审核⏳\n` +
                 `hash: ${hash.substring(0, 7)}\n\n` +
-                `录制时长: ${FormatUtils.formatDurationWithoutSeconds(recorder.duration)}\n\n` +
-                `投稿耗时: ${FormatUtils.formatDurationWithoutSeconds(uploadVideoInfo.duration)}`
+                `录制时长: ${FormatUtils.formatDurationWithoutSeconds(
+                  recorder.duration
+                )}\n\n` +
+                `投稿耗时: ${FormatUtils.formatDurationWithoutSeconds(
+                  uploadVideoInfo.duration
+                )}`
             ),
           ]);
 
@@ -1478,7 +1807,11 @@ export default class QQBotService {
               logger.error("机器人实例对象不存在！");
               return;
             }
-            await this.bot.sendGroup(parseInt(gid), [OneBotMessageUtils.Text(`录播转码审核超时，已停止追踪⚠️\n` + `hash: ${hash.substring(0, 7)}`)]);
+            await this.bot.sendGroup(parseInt(gid), [
+              OneBotMessageUtils.Text(
+                `录播审核超时，已停止追踪⚠️\n` + `hash: ${hash.substring(0, 7)}`
+              ),
+            ]);
 
             logger.debug(`群聊通知完成✅ -> Group ${gid}`);
           });
@@ -1494,7 +1827,9 @@ export default class QQBotService {
               }
               await this.bot.sendGroup(parseInt(gid), [
                 OneBotMessageUtils.Text(
-                  `录播审核已通过✅\n` + `hash: ${hash.substring(0, 7)}\n\n` + `视频地址: \nhttps://www.bilibili.com/video/${bvid}`
+                  `录播审核已通过✅\n` +
+                    `hash: ${hash.substring(0, 7)}\n\n` +
+                    `视频地址: \nhttps://www.bilibili.com/video/${bvid}`
                 ),
               ]);
 
@@ -1521,15 +1856,24 @@ export default class QQBotService {
 
             // tracker.stop();
 
-            let message = `录播转码审核未通过❌\n` + `hash: ${hash.substring(0, 7)}\n\n` + `状态：`;
+            let message =
+              `录播转码审核未通过❌\n` +
+              `hash: ${hash.substring(0, 7)}\n\n` +
+              `状态：`;
 
             if (newState === AuditState.TRANSCODE_FAIL) {
+              logger.debug("视频转码失败， 停止继续追踪");
+              tracker.stop();
+              clearTimeout(trackerTimeOut);
+
               // 视频稿件问题
               message += "转码失败❌";
               const xcodeDetails = await tracker.getXcodeState();
 
               xcodeDetails.forEach((detail, index) => {
-                message += `\n\n视频 ${index + 1} 问题: ${detail.fail_tip || "无"}`;
+                message += `\n\n视频 ${index + 1} 问题: ${
+                  detail.fail_tip || "无"
+                }`;
               });
             } else {
               // 审核问题
@@ -1544,13 +1888,20 @@ export default class QQBotService {
                 message += "未知状态❓";
               }
 
-              if (!detail.problem_detail || detail.problem_detail.length === 0) {
+              if (
+                !detail.problem_detail ||
+                detail.problem_detail.length === 0
+              ) {
                 message += "\n\n问题详情：未知";
               } else {
                 detail.problem_detail.forEach((detail, index) => {
-                  message += `\n\n稿件问题 ${index + 1}:\n${detail.reject_reason}\n\n`;
+                  message += `\n\n稿件问题 ${index + 1}:\n${
+                    detail.reject_reason
+                  }\n\n`;
                   message += `违规时间点: ${detail.violation_time || "无"}\n\n`;
-                  message += `违规位置: ${detail.violation_position || "无"}\n\n`;
+                  message += `违规位置: ${
+                    detail.violation_position || "无"
+                  }\n\n`;
                   message += `修改建议:\n${detail.modify_advise}`;
                 });
               }
@@ -1563,7 +1914,9 @@ export default class QQBotService {
                 logger.error("机器人实例对象不存在！");
                 return;
               }
-              await this.bot.sendGroup(parseInt(gid), [OneBotMessageUtils.Text(message)]);
+              await this.bot.sendGroup(parseInt(gid), [
+                OneBotMessageUtils.Text(message),
+              ]);
 
               logger.debug(`群聊通知完成✅ -> Group ${gid}`);
             });
@@ -1571,14 +1924,69 @@ export default class QQBotService {
         });
       }
     });
+
+    videoUploader.on("fail", (error) => {
+      const liveRoomConfig =
+        qqBotConfigManager.get("liveRoom")[roomId.toString()];
+
+      if (!liveRoomConfig) {
+        logger.debug(`直播间 ${roomId} 配置不存在或未配置`);
+        return;
+      }
+      if (!liveRoomConfig.notify) {
+        logger.debug(`直播间 ${roomId} 通知已禁用！`);
+        return;
+      }
+
+      const notifyGroups = liveRoomConfig.group || {};
+
+      if (Object.keys(notifyGroups).length === 0) {
+        logger.debug(`直播间 ${roomId} 无群组订阅, 跳过通知`);
+      } else {
+        Object.entries(notifyGroups).forEach(async ([gid, group]) => {
+          if (!this.bot) {
+            logger.error("机器人实例对象不存在！");
+            return;
+          }
+
+          let errMessage = error.message;
+
+          if (error instanceof AxiosError) {
+            errMessage =
+              `请求失败❌\n` +
+              `错误原因: ${error.message}\n` +
+              `响应错误: ${error.response?.data.message || "无"}\n` +
+              `响应数据: ${error.response?.data}`;
+          }
+
+          await this.bot.sendGroup(parseInt(gid), [
+            OneBotMessageUtils.Text(
+              `录播投稿失败❌\n` +
+                `hash: ${hash.substring(0, 7)}\n\n` +
+                `错误原因: ${errMessage}\n\n` +
+                `使用下面命令重新投稿: \n` +
+                `重新投稿 ${hash}`
+            ),
+          ]);
+
+          logger.debug(`群聊通知完成✅ -> Group ${gid}`);
+        });
+      }
+    });
   }
 }
 
 class Utils {
-  static async renderLiveStatusTemplate(roomInfo: LiveRoomInfo, liveHash: string) {
-    const upUserInfo = await BiliAccountService.getDefault().getBiliApi().getUserInfo(roomInfo.uid);
+  static async renderLiveStatusTemplate(
+    roomInfo: LiveRoomInfo,
+    liveHash: string
+  ) {
+    const upUserInfo = await BiliAccountService.getDefault()
+      .getBiliApi()
+      .getUserInfo(roomInfo.uid);
 
-    if (roomInfo.live_status === LiveRoomStatus.LIVE) return Utils.renderLiveStartTemplate(roomInfo, liveHash);
+    if (roomInfo.live_status === LiveRoomStatus.LIVE)
+      return Utils.renderLiveStartTemplate(roomInfo, liveHash);
 
     return [
       OneBotMessageUtils.UrlImage(roomInfo.user_cover),
@@ -1586,14 +1994,21 @@ class Utils {
         `【${upUserInfo.name}】${roomInfo.title}\n` +
           `🆔 直播间ID: ${roomInfo.room_id}\n` +
           `📝 直播间简介: ${roomInfo.description}\n` +
-          `📊 直播间状态: ${Utils.getLiveRoomStatusText(roomInfo.live_status)}\n\n` +
+          `📊 直播间状态: ${Utils.getLiveRoomStatusText(
+            roomInfo.live_status
+          )}\n\n` +
           `https://live.bilibili.com/${roomInfo.room_id}`
       ),
     ];
   }
 
-  static async renderLiveStartTemplate(roomInfo: LiveRoomInfo, liveHash: string) {
-    const upUserInfo = await BiliAccountService.getDefault().getBiliApi().getUserInfo(roomInfo.uid);
+  static async renderLiveStartTemplate(
+    roomInfo: LiveRoomInfo,
+    liveHash: string
+  ) {
+    const upUserInfo = await BiliAccountService.getDefault()
+      .getBiliApi()
+      .getUserInfo(roomInfo.uid);
 
     const liveTime = new Date(roomInfo.live_time);
     const nowTiem = new Date();
@@ -1604,12 +2019,16 @@ class Utils {
         `【${upUserInfo.name}】${roomInfo.title}\n` +
           `🆔 直播间ID: ${roomInfo.room_id}\n` +
           `📝 直播间简介: ${roomInfo.description}\n` +
-          `📊 直播间状态: ${Utils.getLiveRoomStatusText(roomInfo.live_status)}\n` +
+          `📊 直播间状态: ${Utils.getLiveRoomStatusText(
+            roomInfo.live_status
+          )}\n` +
           `🎬 直播间场次: ${FormatUtils.formatDateWithSession(liveTime)}\n` +
           `🔥 直播间人气: ${roomInfo.online}\n` +
           `🔑 直播场哈希: ${liveHash.substring(0, 7)}\n` +
           `⏰ 开播时间: ${FormatUtils.formatDateTime(liveTime)}\n` +
-          `⏱️ 直播时长: ${FormatUtils.formatDurationDetailed(nowTiem.getTime() - liveTime.getTime())}\n\n` +
+          `⏱️ 直播时长: ${FormatUtils.formatDurationDetailed(
+            nowTiem.getTime() - liveTime.getTime()
+          )}\n\n` +
           `https://live.bilibili.com/${roomInfo.room_id}`
       ),
     ];
@@ -1626,7 +2045,9 @@ class Utils {
     liveHash: string;
     liveDuration: number;
   }) {
-    const upUserInfo = await BiliAccountService.getDefault().getBiliApi().getUserInfo(liveEndRoomInfo.uid);
+    const upUserInfo = await BiliAccountService.getDefault()
+      .getBiliApi()
+      .getUserInfo(liveEndRoomInfo.uid);
 
     const liveTime = new Date(liveStartRoomInfo.live_time);
     const nowTiem = new Date();
@@ -1637,12 +2058,16 @@ class Utils {
         `【${upUserInfo.name}】${liveEndRoomInfo.title}\n` +
           `🆔 直播间ID: ${liveEndRoomInfo.room_id}\n` +
           `📝 直播间简介: ${liveEndRoomInfo.description}\n` +
-          `📊 直播间状态: ${Utils.getLiveRoomStatusText(liveEndRoomInfo.live_status)}\n` +
+          `📊 直播间状态: ${Utils.getLiveRoomStatusText(
+            liveEndRoomInfo.live_status
+          )}\n` +
           `🎬 直播间场次: ${FormatUtils.formatDateWithSession(liveTime)}\n` +
           `🔑 直播场哈希: ${liveHash.substring(0, 7)}\n` +
           `⏰ 开播时间: ${FormatUtils.formatDateTime(liveTime)}\n` +
           `🛑 关播时间: ${FormatUtils.formatDateTime(nowTiem)}\n` +
-          `⏱️ 直播时长: ${FormatUtils.formatDurationDetailed(liveDuration)}\n\n` +
+          `⏱️ 直播时长: ${FormatUtils.formatDurationDetailed(
+            liveDuration
+          )}\n\n` +
           `https://live.bilibili.com/${liveEndRoomInfo.room_id}`
       ),
     ];
@@ -1665,7 +2090,11 @@ class Utils {
   static async renderNewDynamic(card: DynamicNewCardsMember) {
     try {
       const dynamicRenderConfig = appConfigManager.get("dynamicRender");
-      const base64 = await SpaceDynamicRender.render(dynamicRenderConfig, card, BiliAccountService.getDefault().getAccount().getCookie());
+      const base64 = await SpaceDynamicRender.render(
+        dynamicRenderConfig,
+        card,
+        BiliAccountService.getDefault().getAccount().getCookie()
+      );
       return [OneBotMessageUtils.Base64Image(base64)];
     } catch (e) {
       return [OneBotMessageUtils.Text("渲染失败: " + e)];
@@ -1713,7 +2142,9 @@ class SubscriptionQuery<T extends DataStore<string>> {
 
     for (const [resourceId, config] of Object.entries(this.data)) {
       // 检查用户是否在任何一个群组中
-      const hasSubscription = Object.values(config.group).some((group) => group.users.includes(userId));
+      const hasSubscription = Object.values(config.group).some((group) =>
+        group.users.includes(userId)
+      );
 
       if (hasSubscription) {
         subscriptions.push(resourceId);
@@ -1741,7 +2172,11 @@ class SubscriptionQuery<T extends DataStore<string>> {
     }
 
     const officialResource = this.getOfficialResource(groupId);
-    if (officialResource && !subscriptions.includes(officialResource.toString())) subscriptions.push(officialResource.toString());
+    if (
+      officialResource &&
+      !subscriptions.includes(officialResource.toString())
+    )
+      subscriptions.push(officialResource.toString());
 
     return subscriptions;
   }
@@ -1801,7 +2236,11 @@ class SubscriptionQuery<T extends DataStore<string>> {
    * @param userId 用户ID
    * @param groupId 群组ID（可选，不传则检查所有群组）
    */
-  hasUserSubscribed(resourceId: number, userId: number, groupId?: number): boolean {
+  hasUserSubscribed(
+    resourceId: number,
+    userId: number,
+    groupId?: number
+  ): boolean {
     const config = this.data[resourceId.toString()];
     if (!config) return false;
 
@@ -1810,7 +2249,9 @@ class SubscriptionQuery<T extends DataStore<string>> {
       return group ? group.users.includes(userId) : false;
     }
 
-    return Object.values(config.group).some((group) => group.users.includes(userId));
+    return Object.values(config.group).some((group) =>
+      group.users.includes(userId)
+    );
   }
 
   /**

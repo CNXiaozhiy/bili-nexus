@@ -55,6 +55,7 @@ interface DoneResponse {
 export default class VideoUploader extends EventEmitter<{
   "task-update": [Task[][]];
   done: [DoneResponse];
+  fail: [Error];
 }> {
   private logger;
   private status = 0;
@@ -63,7 +64,11 @@ export default class VideoUploader extends EventEmitter<{
 
   private readonly biliApi: BiliApi;
 
-  constructor(private readonly name: string, private readonly biliAccount: BiliAccount, private readonly options: VideoUploaderOptions) {
+  constructor(
+    private readonly name: string,
+    private readonly biliAccount: BiliAccount,
+    private readonly options: VideoUploaderOptions
+  ) {
     super();
     this.logger = getLogger("VideoUploader." + this.name);
     this.biliApi = biliAccount.getBiliApi();
@@ -74,7 +79,10 @@ export default class VideoUploader extends EventEmitter<{
 
     // 基础数据
     const { videoInfo } = this.options;
-    this.tasks = Array.from({ length: this.options.videos.length + 1 }, () => []);
+    this.tasks = Array.from(
+      { length: this.options.videos.length + 1 },
+      () => []
+    );
 
     const warnings: string[] = [];
 
@@ -149,7 +157,17 @@ export default class VideoUploader extends EventEmitter<{
         this.logger.info(`投稿器[${this.name}] -> 视频[${iVideo}] 预上传完成`);
 
         // 整理信息
-        const { auth, endpoints, biz_id: bizId, chunk_retry, chunk_retry_delay, chunk_size, threads, timeout, upos_uri } = preuploadResp;
+        const {
+          auth,
+          endpoints,
+          biz_id: bizId,
+          chunk_retry,
+          chunk_retry_delay,
+          chunk_size,
+          threads,
+          timeout,
+          upos_uri,
+        } = preuploadResp;
 
         const chunkSize = Math.ceil(chunk_size / 2);
 
@@ -175,7 +193,9 @@ export default class VideoUploader extends EventEmitter<{
 
         task.success();
 
-        this.logger.info(`投稿器[${this.name}] -> 视频[${iVideo}] 获取上传元数据完成`);
+        this.logger.info(
+          `投稿器[${this.name}] -> 视频[${iVideo}] 获取上传元数据完成`
+        );
 
         task = pushTask("视频上传");
         task.process(`0/${totalChunks}`);
@@ -217,7 +237,12 @@ export default class VideoUploader extends EventEmitter<{
                 //   resp
                 // );
               } catch (e: any) {
-                this.logger.error(`投稿器[${this.name}] -> 视频[${iVideo}] 分片[${i + 1}/${totalChunks}] 上传失败 ->`, e);
+                this.logger.error(
+                  `投稿器[${this.name}] -> 视频[${iVideo}] 分片[${
+                    i + 1
+                  }/${totalChunks}] 上传失败 ->`,
+                  e
+                );
                 return;
               }
             })
@@ -228,7 +253,9 @@ export default class VideoUploader extends EventEmitter<{
 
         task.success();
 
-        this.logger.info(`投稿器[${this.name}] -> 视频[${iVideo}] 视频上传完成`);
+        this.logger.info(
+          `投稿器[${this.name}] -> 视频[${iVideo}] 视频上传完成`
+        );
 
         task = pushTask("校验结果");
 
@@ -242,7 +269,9 @@ export default class VideoUploader extends EventEmitter<{
 
         task.success();
 
-        this.logger.info(`投稿器[${this.name}] -> 视频[${iVideo}] 校验结果完成`);
+        this.logger.info(
+          `投稿器[${this.name}] -> 视频[${iVideo}] 校验结果完成`
+        );
 
         biliFileNames.push(biliFileName);
         bizIds.push(bizId);
@@ -255,11 +284,15 @@ export default class VideoUploader extends EventEmitter<{
 
       task = pushTask("上传封面");
 
-      const coverUrl = videoInfo.coverBase64 ? (await this.biliApi.uploadCover(videoInfo.coverBase64)).url : videoInfo.cover;
+      const coverUrl = videoInfo.coverBase64
+        ? (await this.biliApi.uploadCover(videoInfo.coverBase64)).url
+        : videoInfo.cover;
 
       task.success();
 
-      this.logger.info(`投稿器[${this.name}] -> 视频 上传封面完成: ${coverUrl}`);
+      this.logger.info(
+        `投稿器[${this.name}] -> 视频 上传封面完成: ${coverUrl}`
+      );
 
       task = pushTask("投稿标签预测");
 
@@ -341,15 +374,24 @@ export default class VideoUploader extends EventEmitter<{
             cid: bizIds[0],
             title: videoInfo.title,
           });
-          this.logger.info(`已将视频添加至合集 -> ${videoInfo.season.sectionId}(sectionId)`);
+          this.logger.info(
+            `已将视频添加至合集 -> ${videoInfo.season.sectionId}(sectionId)`
+          );
           task.success();
-        } else if (videoInfo.season && (videoInfo.season.seasonId || videoInfo.season.name)) {
+        } else if (
+          videoInfo.season &&
+          (videoInfo.season.seasonId || videoInfo.season.name)
+        ) {
           let season = seasonResp.seasons.find(
-            videoInfo.season.seasonId ? (e) => e.season.id === videoInfo.season?.seasonId : (e) => e.season.title === videoInfo.season?.name
+            videoInfo.season.seasonId
+              ? (e) => e.season.id === videoInfo.season?.seasonId
+              : (e) => e.season.title === videoInfo.season?.name
           );
 
           if (!season && videoInfo.season.name && videoInfo.season.autoCreate) {
-            this.logger.info(`合集 ${videoInfo.season.name} 不存在, 开始自动创建`);
+            this.logger.info(
+              `合集 ${videoInfo.season.name} 不存在, 开始自动创建`
+            );
             const { data: seasonId } = await this.biliApi.addSeason({
               title: videoInfo.season.name,
               cover: videoInfo.season.autoCreate.cover,
@@ -366,11 +408,19 @@ export default class VideoUploader extends EventEmitter<{
           }
 
           if (!season) {
-            this.logger.error(`添加至合集失败: 未找到合集, by ->`, videoInfo.season);
-            warnings.push(`添加至合集失败: 未找到合集 ${JSON.stringify(videoInfo.season)}`);
+            this.logger.error(
+              `添加至合集失败: 未找到合集, by ->`,
+              videoInfo.season
+            );
+            warnings.push(
+              `添加至合集失败: 未找到合集 ${JSON.stringify(videoInfo.season)}`
+            );
           } else {
             const sectionId = season.sections.sections[0].id;
-            this.logger.debug(`找到合集小节ID (sectionId) -> ${sectionId}, by ->`, videoInfo.season);
+            this.logger.debug(
+              `找到合集小节ID (sectionId) -> ${sectionId}, by ->`,
+              videoInfo.season
+            );
             await this.addToSeason(sectionId, {
               aid: resp.aid,
               cid: bizIds[0],
@@ -385,7 +435,11 @@ export default class VideoUploader extends EventEmitter<{
       this.duration = Date.now() - startTime;
 
       const res = {
-        tracker: new VideoTracker(this.name + "." + resp.bvid, this.biliAccount, resp.bvid),
+        tracker: new VideoTracker(
+          this.name + "." + resp.bvid,
+          this.biliAccount,
+          resp.bvid
+        ),
         warnings,
         ...resp,
         bizIds,
@@ -398,11 +452,15 @@ export default class VideoUploader extends EventEmitter<{
       return res;
     } catch (e) {
       task.error((e as Error).message);
+      this.emit("fail", e as Error);
       throw e;
     }
   }
 
-  private async addToSeason(sectionId: number, episode: { aid: number; cid: number; title: string }) {
+  private async addToSeason(
+    sectionId: number,
+    episode: { aid: number; cid: number; title: string }
+  ) {
     const { aid, cid, title } = episode;
     const resp = await this.biliApi.addSeasonEpisodes({
       episodes: [

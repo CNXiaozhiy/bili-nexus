@@ -1,4 +1,4 @@
-import { BiliApiError } from "./bili-api";
+import { BiliApiError, BiliHttpApiError } from "./bili-api";
 
 export class AccountLoginExpiredError extends BiliApiError {
   constructor(message: string) {
@@ -7,9 +7,4 @@ export class AccountLoginExpiredError extends BiliApiError {
   }
 }
 
-export class UploadVideoError extends BiliApiError {
-  constructor(message: string) {
-    super(message);
-    this.name = "UploadVideoError";
-  }
-}
+export class UploadVideoError extends BiliHttpApiError {}

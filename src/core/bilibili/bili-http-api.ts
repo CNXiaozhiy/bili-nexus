@@ -19,13 +19,17 @@ import {
 } from "@/types/bilibili";
 import { Response } from "@/types/bilibili/bili-http-api";
 import { BiliHttpApiError } from "@/types/errors/bili-api";
-import { AccountLoginExpiredError, UploadVideoError } from "@/types/errors/bili-http-api";
+import {
+  AccountLoginExpiredError,
+  UploadVideoError,
+} from "@/types/errors/bili-http-api";
 import fs from "fs";
 import { AxiosError, AxiosProgressEvent } from "axios";
 import { IBiliHttpApi } from "@/types/bilibili/bili-http-api";
 
 function checkResponseCode<T>(resp: Response<T>) {
-  if (resp.code !== 0) throw new BiliHttpApiError(resp.message, resp.code, resp.data ?? {});
+  if (resp.code !== 0)
+    throw new BiliHttpApiError(resp.message, resp.code, resp.data ?? {});
 }
 
 // class Account {
@@ -48,9 +52,9 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
    * @returns
    */
   async generateLoginQrcode() {
-    const resp = await request.get<Response<{ url: string; qrcode_key: string }>>(
-      "https://passport.bilibili.com/x/passport-login/web/qrcode/generate"
-    );
+    const resp = await request.get<
+      Response<{ url: string; qrcode_key: string }>
+    >("https://passport.bilibili.com/x/passport-login/web/qrcode/generate");
 
     checkResponseCode(resp.data);
 
@@ -70,14 +74,19 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
         timestamp: number;
         code: 0 | 86038 | 86090 | 86101;
       }>
-    >(`https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key=${qrcode_key}`);
+    >(
+      `https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key=${qrcode_key}`
+    );
 
     checkResponseCode(resp.data);
 
     let cookie: string | null = null;
 
     if (resp.data.data.code === 0) {
-      if (resp.headers["set-cookie"] && Array.isArray(resp.headers["set-cookie"])) {
+      if (
+        resp.headers["set-cookie"] &&
+        Array.isArray(resp.headers["set-cookie"])
+      ) {
         cookie = BiliUtils.parseCookies(resp.headers["set-cookie"]);
       } else {
         throw new Error("获取 set-cookie 失败");
@@ -97,9 +106,12 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       code: 0 | -101;
       message: string;
       data: { refresh: boolean; timestamp: number };
-    }>(`https://passport.bilibili.com/x/passport-login/web/cookie/info?csrf=${csrf}`, {
-      headers: { cookie: this.getCookie() },
-    });
+    }>(
+      `https://passport.bilibili.com/x/passport-login/web/cookie/info?csrf=${csrf}`,
+      {
+        headers: { cookie: this.getCookie() },
+      }
+    );
 
     checkResponseCode(resp.data);
 
@@ -129,17 +141,25 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
 
     async function getCorrespondPath(timestamp: number) {
       const data = new TextEncoder().encode(`refresh_${timestamp}`);
-      const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, data));
-      return encrypted.reduce((str, c) => str + c.toString(16).padStart(2, "0"), "");
+      const encrypted = new Uint8Array(
+        await crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, data)
+      );
+      return encrypted.reduce(
+        (str, c) => str + c.toString(16).padStart(2, "0"),
+        ""
+      );
     }
 
     const correspondPath = await getCorrespondPath(timestamp);
 
-    const { data: html } = await request.get<string>(`https://www.bilibili.com/correspond/1/${correspondPath}`, {
-      headers: {
-        cookie: this.getCookie(),
-      },
-    });
+    const { data: html } = await request.get<string>(
+      `https://www.bilibili.com/correspond/1/${correspondPath}`,
+      {
+        headers: {
+          cookie: this.getCookie(),
+        },
+      }
+    );
 
     const regex = /<div id="1-name">(.*?)<\/div>/;
     const match = html.match(regex);
@@ -150,7 +170,9 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
 
     const refresh_csrf = match[1];
 
-    const resp = await request.post<Response<{ status: number; message: string; refresh_token: string }>>(
+    const resp = await request.post<
+      Response<{ status: number; message: string; refresh_token: string }>
+    >(
       `https://passport.bilibili.com/x/passport-login/web/cookie/refresh?csrf=${csrf}&refresh_csrf=${refresh_csrf}&source=main_web&refresh_token=${refresh_token}`,
       {
         method: "POST",
@@ -166,15 +188,21 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
 
     checkResponseCode(resp.data);
 
-    if (resp.headers["set-cookie"] && Array.isArray(resp.headers["set-cookie"])) {
+    if (
+      resp.headers["set-cookie"] &&
+      Array.isArray(resp.headers["set-cookie"])
+    ) {
       const new_refresh_token = resp.data.data.refresh_token;
       const newCookie = BiliUtils.parseCookies(resp.headers["set-cookie"]);
 
-      await request.post(`https://passport.bilibili.com/x/passport-login/web/confirm/refresh?csrf=${csrf}&refresh_token=${refresh_token}`, {
-        headers: {
-          cookie: newCookie,
-        },
-      });
+      await request.post(
+        `https://passport.bilibili.com/x/passport-login/web/confirm/refresh?csrf=${csrf}&refresh_token=${refresh_token}`,
+        {
+          headers: {
+            cookie: newCookie,
+          },
+        }
+      );
 
       return {
         cookie: newCookie,
@@ -187,13 +215,16 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
 
   // 直播类
   async getLiveRoomInfo(roomId: string | number, noRetry = false) {
-    const resp = await request.get<Response<LiveRoomInfo>>(`https://api.live.bilibili.com/room/v1/Room/get_info?room_id=${roomId}`, {
-      headers: {
-        Referer: "https://live.bilibili.com/",
-        cookie: this.getCookie(),
-        "No-Retry": noRetry,
-      },
-    });
+    const resp = await request.get<Response<LiveRoomInfo>>(
+      `https://api.live.bilibili.com/room/v1/Room/get_info?room_id=${roomId}`,
+      {
+        headers: {
+          Referer: "https://live.bilibili.com/",
+          cookie: this.getCookie(),
+          "No-Retry": noRetry,
+        },
+      }
+    );
 
     checkResponseCode(resp.data);
 
@@ -213,18 +244,24 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
   }
 
   async getLiveStreamUrl(roomId: string | number) {
-    const resp = await request.get<Response<LiveRoomPlayInfo>>(`https://api.live.bilibili.com/room/v1/Room/playUrl?cid=${roomId}&qn=0&platform=web`, {
-      headers: {
-        Referer: "https://live.bilibili.com/",
-        cookie: this.getCookie(),
-      },
-      shouldRetry: (resp) => resp.data.code === 19001012, // bvc-play-url-one
-    });
+    const resp = await request.get<Response<LiveRoomPlayInfo>>(
+      `https://api.live.bilibili.com/room/v1/Room/playUrl?cid=${roomId}&qn=0&platform=web`,
+      {
+        headers: {
+          Referer: "https://live.bilibili.com/",
+          cookie: this.getCookie(),
+        },
+        shouldRetry: (resp) => resp.data.code === 19001012, // bvc-play-url-one
+      }
+    );
 
     checkResponseCode(resp.data);
 
-    if (!resp.data.data.durl || resp.data.data.durl.length === 0) throw new Error("durl not found");
-    const urls = resp.data.data.durl.map((item) => item?.url).filter((url) => url !== undefined);
+    if (!resp.data.data.durl || resp.data.data.durl.length === 0)
+      throw new Error("durl not found");
+    const urls = resp.data.data.durl
+      .map((item) => item?.url)
+      .filter((url) => url !== undefined);
     return urls;
   }
 
@@ -250,7 +287,10 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
 
   async getDanmuInfo(roomId: string | number) {
     const resp = await request.get<Response<DanmuInfo>>(
-      `https://api.live.bilibili.com/xlive/web-room/v1/index/getDanmuInfo?${encWbi({ id: roomId }, await this.getAccountInfo())}`,
+      `https://api.live.bilibili.com/xlive/web-room/v1/index/getDanmuInfo?${encWbi(
+        { id: roomId },
+        await this.getAccountInfo()
+      )}`,
       {
         headers: {
           cookie: this.getCookie(),
@@ -264,7 +304,12 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
   }
 
   // room_id 似乎没用
-  async getLiveRoomContributionRank(uid: string | number, room_id: string | number = 1, page = 1, page_size = 1) {
+  async getLiveRoomContributionRank(
+    uid: string | number,
+    room_id: string | number = 1,
+    page = 1,
+    page_size = 1
+  ) {
     const resp = await request.get<Response<any>>(
       `https://api.live.bilibili.com/xlive/general-interface/v1/rank/queryContributionRank?ruid=${uid}&room_id=${room_id}&page=${page}&page_size=${page_size}&type=online_rank`,
       {
@@ -287,12 +332,15 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       if (cache) return cache;
     }
 
-    const resp = await request.get<Response<VideoInfo>>(`https://api.bilibili.com/x/web-interface/wbi/view?bvid=${bvid}`, {
-      headers: {
-        Referer: "https://live.bilibili.com/",
-        cookie: this.getCookie(),
-      },
-    });
+    const resp = await request.get<Response<VideoInfo>>(
+      `https://api.bilibili.com/x/web-interface/wbi/view?bvid=${bvid}`,
+      {
+        headers: {
+          Referer: "https://live.bilibili.com/",
+          cookie: this.getCookie(),
+        },
+      }
+    );
 
     checkResponseCode(resp.data);
 
@@ -308,9 +356,12 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
    * @returns
    */
   async getAccountInfo() {
-    const resp = await request.get<Response<LoginInfo>>("https://api.bilibili.com/x/web-interface/nav", {
-      headers: { cookie: this.getCookie() },
-    });
+    const resp = await request.get<Response<LoginInfo>>(
+      "https://api.bilibili.com/x/web-interface/nav",
+      {
+        headers: { cookie: this.getCookie() },
+      }
+    );
 
     checkResponseCode(resp.data);
 
@@ -324,9 +375,12 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       if (cache) return cache;
     }
 
-    const resp = await request.get<Response<UserCard>>(`https://api.bilibili.com/x/web-interface/card?mid=${mid}`, {
-      headers: { cookie: this.getCookie() },
-    });
+    const resp = await request.get<Response<UserCard>>(
+      `https://api.bilibili.com/x/web-interface/card?mid=${mid}`,
+      {
+        headers: { cookie: this.getCookie() },
+      }
+    );
 
     checkResponseCode(resp.data);
 
@@ -341,7 +395,10 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       if (cache) return cache;
     }
 
-    const url = `https://api.bilibili.com/x/space/wbi/acc/info?${encWbi({ mid }, await this.getAccountInfo())}`;
+    const url = `https://api.bilibili.com/x/space/wbi/acc/info?${encWbi(
+      { mid },
+      await this.getAccountInfo()
+    )}`;
 
     const resp = await request.get<Response<UserInfo>>(url, {
       headers: { cookie: this.getCookie() },
@@ -355,9 +412,12 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
 
   // 动态类
   async getSpaceDynamic(uid: number, noRetry = false) {
-    const resp = await request.get<Response<SpaceDynamic>>(`https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/space?host_mid=${uid}`, {
-      headers: { cookie: this.getCookie(), "No-Retry": noRetry },
-    });
+    const resp = await request.get<Response<SpaceDynamic>>(
+      `https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/space?host_mid=${uid}`,
+      {
+        headers: { cookie: this.getCookie(), "No-Retry": noRetry },
+      }
+    );
 
     checkResponseCode(resp.data);
 
@@ -378,9 +438,12 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
   }
 
   async getDynamicNew(typeList = 268435455) {
-    const resp = await request.get<Response<DynamicNew>>(`https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/dynamic_new?type_list=${typeList}`, {
-      headers: { cookie: this.getCookie() },
-    });
+    const resp = await request.get<Response<DynamicNew>>(
+      `https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/dynamic_new?type_list=${typeList}`,
+      {
+        headers: { cookie: this.getCookie() },
+      }
+    );
 
     checkResponseCode(resp.data);
 
@@ -403,11 +466,14 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
           xcode_state: number;
         }[];
       }>
-    >(`https://member.bilibili.com/x/web/detail/videos?mode=1&ps=500&pn=1&bvid=${bvid}`, {
-      headers: {
-        cookie: this.getCookie(),
-      },
-    });
+    >(
+      `https://member.bilibili.com/x/web/detail/videos?mode=1&ps=500&pn=1&bvid=${bvid}`,
+      {
+        headers: {
+          cookie: this.getCookie(),
+        },
+      }
+    );
 
     checkResponseCode(resp.data);
 
@@ -415,11 +481,14 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
   }
 
   async getVideoDetailXcode(bvid: string, cid: number) {
-    const resp = await request.get<Response<VideoDetailXcode>>(`https://member.bilibili.com/x/web/detail/xcode?bvid=${bvid}&cid=${cid}`, {
-      headers: {
-        cookie: this.getCookie(),
-      },
-    });
+    const resp = await request.get<Response<VideoDetailXcode>>(
+      `https://member.bilibili.com/x/web/detail/xcode?bvid=${bvid}&cid=${cid}`,
+      {
+        headers: {
+          cookie: this.getCookie(),
+        },
+      }
+    );
 
     checkResponseCode(resp.data);
 
@@ -427,11 +496,14 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
   }
 
   async getVideoDetailAudit(bvid: string) {
-    const resp = await request.get<Response<VideoDetailAudit>>(`https://member.bilibili.com/x/web/detail/audit?bvid=${bvid}`, {
-      headers: {
-        cookie: this.getCookie(),
-      },
-    });
+    const resp = await request.get<Response<VideoDetailAudit>>(
+      `https://member.bilibili.com/x/web/detail/audit?bvid=${bvid}`,
+      {
+        headers: {
+          cookie: this.getCookie(),
+        },
+      }
+    );
 
     checkResponseCode(resp.data);
 
@@ -439,11 +511,14 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
   }
 
   async getVideoDetailArchive(bvid: string) {
-    const resp = await request.get<Response<VideoDetailArchive>>(`https://member.bilibili.com/x/web/detail/archive?bvid=${bvid}`, {
-      headers: {
-        cookie: this.getCookie(),
-      },
-    });
+    const resp = await request.get<Response<VideoDetailArchive>>(
+      `https://member.bilibili.com/x/web/detail/archive?bvid=${bvid}`,
+      {
+        headers: {
+          cookie: this.getCookie(),
+        },
+      }
+    );
 
     checkResponseCode(resp.data);
 
@@ -473,15 +548,25 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
           Referer: "https://member.bilibili.com/platform/upload/video/frame",
           cookie: this.getCookie(),
         },
+        shouldRetry: (resp) => {
+          return resp.data.code === 601; // 上传视频过快
+        },
       }
     );
 
-    if (resp.data.OK !== 1) throw new UploadVideoError("获取上传元数据失败");
+    if (resp.data.OK !== 1)
+      throw new UploadVideoError("获取上传元数据失败", resp.status, resp.data);
 
     return resp.data;
   }
 
-  async getUploadID(options: { uploadUrl: string; fileSize: number; partSize: number; bizId: number; auth: string }) {
+  async getUploadID(options: {
+    uploadUrl: string;
+    fileSize: number;
+    partSize: number;
+    bizId: number;
+    auth: string;
+  }) {
     const resp = await request.post<{
       OK: number;
       bucket: string;
@@ -500,27 +585,38 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       }
     );
 
-    if (resp.data.OK !== 1) throw new UploadVideoError("获取上传 ID 失败");
+    if (resp.data.OK !== 1)
+      throw new UploadVideoError("获取上传 ID 失败", resp.status, resp.data);
     return resp.data;
   }
 
-  async validateVideo(options: { uploadUrl: string; fileName: string; auth: string; bizId: number; uploadId: string }) {
+  async validateVideo(options: {
+    uploadUrl: string;
+    fileName: string;
+    auth: string;
+    bizId: number;
+    uploadId: string;
+  }) {
     const resp = await request.post<{
       OK: number;
       location: string;
       bucket: string;
       key: string;
-    }>(`${options.uploadUrl}?output=json&name=${options.fileName}&profile=ugcfx%2Fbup&uploadId=${options.uploadId}&biz_id=${options.bizId}`, {
-      method: "POST",
-      headers: {
-        Origin: "https://member.bilibili.com",
-        Referer: "https://member.bilibili.com/",
-        "X-Upos-Auth": options.auth,
-        Cookie: this.getCookie(),
-      },
-    });
+    }>(
+      `${options.uploadUrl}?output=json&name=${options.fileName}&profile=ugcfx%2Fbup&uploadId=${options.uploadId}&biz_id=${options.bizId}`,
+      {
+        method: "POST",
+        headers: {
+          Origin: "https://member.bilibili.com",
+          Referer: "https://member.bilibili.com/",
+          "X-Upos-Auth": options.auth,
+          Cookie: this.getCookie(),
+        },
+      }
+    );
 
-    if (resp.data.OK !== 1) throw new UploadVideoError("视频合片失败");
+    if (resp.data.OK !== 1)
+      throw new UploadVideoError("视频合片失败", resp.status, resp.data);
     return resp.data;
   }
 
@@ -546,7 +642,8 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       },
     });
 
-    if (resp.data.code !== 0) throw new UploadVideoError(resp.data.message);
+    if (resp.data.code !== 0)
+      throw new UploadVideoError(resp.data.message, resp.data.code, resp.data);
 
     return resp.data.data;
   }
@@ -562,7 +659,15 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
     totalChunks: number;
     onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
   }) {
-    const { filePath, auth, uploadId, chunkIndex, chunkSize: _chunkSize, uploadUrl, totalChunks } = options;
+    const {
+      filePath,
+      auth,
+      uploadId,
+      chunkIndex,
+      chunkSize: _chunkSize,
+      uploadUrl,
+      totalChunks,
+    } = options;
     let { fileSize } = options;
     fileSize = fileSize || fs.statSync(filePath).size;
 
@@ -610,14 +715,20 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       return resp.data;
     } catch (e: any) {
       const err = e as AxiosError;
-      throw new BiliHttpApiError(err.message, err.response?.status, err.response?.data);
+      throw new BiliHttpApiError(
+        err.message,
+        err.response?.status,
+        err.response?.data
+      );
     }
   }
 
   async uploadVideo(data: any) {
     const csrf = BiliUtils.getCSRF(this.getCookie());
 
-    const resp = await request.instance<Response<{ aid: number; bvid: string }>>(`https://member.bilibili.com/x/vu/web/add/v3?csrf=${csrf}`, {
+    const resp = await request.instance<
+      Response<{ aid: number; bvid: string }>
+    >(`https://member.bilibili.com/x/vu/web/add/v3?csrf=${csrf}`, {
       method: "POST",
       headers: {
         Origin: "https://member.bilibili.com",
@@ -645,7 +756,9 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
     cover_url?: string;
   }) {
     const params = new URLSearchParams(options);
-    const resp = await request.get<Response<{ tag: string; checked: number; request_id: string }[]>>(
+    const resp = await request.get<
+      Response<{ tag: string; checked: number; request_id: string }[]>
+    >(
       `https://member.bilibili.com/x/vupre/web/tag/recommend?${params.toString()}`,
       {
         headers: {
@@ -674,18 +787,24 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       {
         title: options.title,
         desc: options.desc,
-        cover: options.cover || "https://s1.hdslb.com/bfs/templar/york-static/viedeo_material_default.png",
+        cover:
+          options.cover ||
+          "https://s1.hdslb.com/bfs/templar/york-static/viedeo_material_default.png",
         season_price: 0,
         csrf,
       }
     );
 
-    if (resp.data.code !== 0) new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
+    if (resp.data.code !== 0)
+      new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
 
     return resp.data;
   }
 
-  async addSeasonEpisodes(options: { episodes: { aid: number; cid: number; title: string }[]; sectionId: number }) {
+  async addSeasonEpisodes(options: {
+    episodes: { aid: number; cid: number; title: string }[];
+    sectionId: number;
+  }) {
     const csrf = BiliUtils.getCSRF(this.getCookie());
     const resp = await request.post<{
       code: number;
@@ -707,7 +826,8 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
       }
     );
 
-    if (resp.data.code !== 0) new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
+    if (resp.data.code !== 0)
+      new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
 
     return resp.data;
   }
@@ -810,16 +930,20 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
         total: number;
         play_type: number;
       }>
-    >(`https://member.bilibili.com/x2/creative/web/seasons?pn=${options.page}&ps=${options.pageNumber}`, {
-      headers: {
-        Origin: "https://member.bilibili.com",
-        Referer: "https://member.bilibili.com",
-        "Content-Type": "application/json",
-        Cookie: this.getCookie(),
-      },
-    });
+    >(
+      `https://member.bilibili.com/x2/creative/web/seasons?pn=${options.page}&ps=${options.pageNumber}`,
+      {
+        headers: {
+          Origin: "https://member.bilibili.com",
+          Referer: "https://member.bilibili.com",
+          "Content-Type": "application/json",
+          Cookie: this.getCookie(),
+        },
+      }
+    );
 
-    if (resp.data.code !== 0) new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
+    if (resp.data.code !== 0)
+      new BiliHttpApiError(resp.data.message, resp.data.code, resp.data);
 
     return resp.data.data;
   }
@@ -829,8 +953,10 @@ export default abstract class BiliHttpApi implements IBiliHttpApi {
 
 function encWbi(params: Record<string, any>, loginInfo: LoginInfo) {
   const mixinKeyEncTab = [
-    46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49, 33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55,
-    40, 61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52,
+    46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49,
+    33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40,
+    61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11,
+    36, 20, 34, 44, 52,
   ];
 
   // 对 imgKey 和 subKey 进行字符顺序打乱编码
@@ -847,13 +973,23 @@ function encWbi(params: Record<string, any>, loginInfo: LoginInfo) {
     } = loginInfo;
 
     return {
-      img_key: img_url.slice(img_url.lastIndexOf("/") + 1, img_url.lastIndexOf(".")),
-      sub_key: sub_url.slice(sub_url.lastIndexOf("/") + 1, sub_url.lastIndexOf(".")),
+      img_key: img_url.slice(
+        img_url.lastIndexOf("/") + 1,
+        img_url.lastIndexOf(".")
+      ),
+      sub_key: sub_url.slice(
+        sub_url.lastIndexOf("/") + 1,
+        sub_url.lastIndexOf(".")
+      ),
     };
   };
 
   // 为请求参数进行 wbi 签名
-  const encWbi = (params: Record<string, any>, img_key: string, sub_key: string) => {
+  const encWbi = (
+    params: Record<string, any>,
+    img_key: string,
+    sub_key: string
+  ) => {
     const mixin_key = getMixinKey(img_key + sub_key),
       curr_time = Math.round(Date.now() / 1000),
       chr_filter = /[!'()*]/g;
