@@ -1024,14 +1024,14 @@ export default class QQBotService {
 
         // 存在校验
         if (
-          !options.hash ||
-          !options.file ||
-          !options.liveStartTime ||
-          !options.liveStopTime ||
-          !options.liveDuration ||
-          !options.recordStartTime ||
-          !options.recordStopTime ||
-          !options.recordDuration
+          options.hash === undefined ||
+          options.file === undefined ||
+          options.liveStartTime === undefined ||
+          options.liveStopTime === undefined ||
+          options.liveDuration === undefined ||
+          options.recordStartTime === undefined ||
+          options.recordStopTime === undefined ||
+          options.recordDuration === undefined
         ) {
           throw new Error("数据校验失败: 必要数据缺失");
         }
@@ -1067,11 +1067,11 @@ export default class QQBotService {
         }
 
         if (
-          !options.liveRoomInfo.title ||
-          !options.liveRoomInfo.uid ||
-          !options.liveRoomInfo.roomId ||
-          !options.liveRoomInfo.description ||
-          !options.liveRoomInfo.user_cover
+          options.liveRoomInfo.title === undefined ||
+          options.liveRoomInfo.uid === undefined ||
+          options.liveRoomInfo.room_id === undefined ||
+          options.liveRoomInfo.description === undefined ||
+          options.liveRoomInfo.user_cover === undefined
         ) {
           throw new Error("liveRoomInfo 初检失败: 必要数据缺失");
         }
