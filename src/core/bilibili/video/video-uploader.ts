@@ -198,7 +198,7 @@ export default class VideoUploader extends EventEmitter<{
         );
 
         task = pushTask("视频上传");
-        task.process(`0/${totalChunks}`);
+        task.process("0%");
 
         const limit = pLimit(threads + 1);
         const uploadChunkTasks = [];
@@ -228,7 +228,13 @@ export default class VideoUploader extends EventEmitter<{
                   // },
                 });
 
-                task.process(`${i + 1}/${totalChunks}`);
+                if (totalChunks === 0) {
+                  task.process(`ERR`);
+                } else {
+                  task.process(
+                    `${(((i + 1) / totalChunks) * 100).toFixed(2)}%`
+                  );
+                }
 
                 // this.logger.info(
                 //   `投稿器[${this.name}] -> 视频[${iVideo}] 分片[${
