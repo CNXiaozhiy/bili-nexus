@@ -159,7 +159,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
 
     this.recFfmpeg.on("progress", (stats: FfmpegStats) => {
       if (!stats.time) {
-        this.logger.debug("异常行为：录制进程返回了空的录制时间❌", stats);
+        this.logger.debug("录制进程返回数据缺失", stats);
         return;
       }
 
@@ -274,6 +274,9 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     this.logger.info(`${this.hash.substring(0, 32)} -> stopRecord()`);
     this.logger.debug(`${this.hash.substring(0, 32)} -> 将设置(覆盖) stopTime`);
     this.stopTime = Date.now();
+
+    this.logger.debug("stopRecord 调用，Watchdog Killed");
+    this._killWatchdog();
 
     return await new Promise<{
       segmentFiles: string[];
