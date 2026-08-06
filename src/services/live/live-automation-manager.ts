@@ -1,11 +1,7 @@
 import EventEmitter from "events";
 import LiveMessageStreamClient from "@/core/bilibili/live/live-message-stream";
 import LiveRecorder from "@/core/bilibili/live/live-recorder";
-import {
-  appConfigManager,
-  biliConfigManager,
-  liveConfigManager,
-} from "@/common";
+import { appConfigManager, biliConfigManager, liveConfigManager } from "@/common";
 import BiliAccountService from "../account/bili-account-service";
 import getLogger from "@/utils/logger";
 import { LiveRoomInfo, LiveRoomStatus, UserCard } from "@/types/bilibili";
@@ -44,18 +40,12 @@ export type UploadEventOptions = UploadOptions & { userCard: UserCard };
 
 export interface LiveAutomationManagerEvents {
   "new-recorder": [liveRecorder: LiveRecorder, hash: string];
-  "new-uploader": [
-    videoUploader: VideoUploader,
-    hash: string,
-    uploadEventOptions: UploadEventOptions
-  ];
+  "new-uploader": [videoUploader: VideoUploader, hash: string, uploadEventOptions: UploadEventOptions];
 
   "new-room": [roomId: number, client: LiveMessageStreamClient];
   "remove-room": [roomId: number];
 
-  "live-start": [
-    { roomId: number; hash: string; roomInfo: LiveRoomInfo; isFirst: boolean }
-  ];
+  "live-start": [{ roomId: number; hash: string; roomInfo: LiveRoomInfo; isFirst: boolean }];
   "live-end": [
     | {
         roomId: number;
@@ -93,22 +83,18 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
   private firstFlagMap: Set<number> = new Set(); // roomId
   private liveStatusMap: Map<number, boolean> = new Map(); // RoomId -> IsLive
 
-  public liveMessageStreamClients: Map<number, LiveMessageStreamClient> =
-    new Map(); // RoomId -> Client
+  public liveMessageStreamClients: Map<number, LiveMessageStreamClient> = new Map(); // RoomId -> Client
   public liveRecorders: Map<string, LiveRecorder> = new Map(); // Hash -> LiveRecorder
   public videoUploaders: Map<string, VideoUploader> = new Map(); // Hash -> VideoUploader
 
   public failedSubmission: Map<string, () => Promise<any>> = new Map(); // short Hash -> submission function
 
-  public diskSpaceMonitor: DiskSpaceMonitor = new DiskSpaceMonitor(
-    appConfigManager.get("recordingDir"),
-    {
-      checkInterval: 30000,
-      lowSpaceThreshold: 10 * 1024 * 1024 * 1024, // 10GB
-      criticalSpaceThreshold: 5 * 1024 * 1024 * 1024, // 5GB
-      fatalSpaceThreshold: 100 * 1024 * 1024, // 100MB
-    }
-  );
+  public diskSpaceMonitor: DiskSpaceMonitor = new DiskSpaceMonitor(appConfigManager.get("recordingDir"), {
+    checkInterval: 30000,
+    lowSpaceThreshold: 10 * 1024 * 1024 * 1024, // 10GB
+    criticalSpaceThreshold: 5 * 1024 * 1024 * 1024, // 5GB
+    fatalSpaceThreshold: 100 * 1024 * 1024, // 100MB
+  });
 
   // 录制超时计时器
   private recordTimeouts = new Map<string, NodeJS.Timeout>(); // Hash -> Timeout
@@ -126,10 +112,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
     this.initDiskSpaceMonitor();
 
-    this.manualPollInterval = setInterval(
-      () => this.manualPoll(),
-      MANUAL_POOL_INTERVAL
-    );
+    this.manualPollInterval = setInterval(() => this.manualPoll(), MANUAL_POOL_INTERVAL);
     logger.info("混合拉取 -> 已安装 manualPoll 定时器");
   }
 
@@ -171,10 +154,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
       const taskCount = taskMap.size;
       if (taskCount === 0) {
-        notifyEmitter.emit(
-          "msg-warn",
-          "严重警告: 磁盘空间不足，且当前无录制任务，请立即检查磁盘状态！"
-        );
+        notifyEmitter.emit("msg-warn", "严重警告: 磁盘空间不足，且当前无录制任务，请立即检查磁盘状态！");
         logger.error("磁盘空间不足，且当前无录制任务，请立即检查磁盘状态");
         return;
       }
@@ -185,10 +165,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       const allHashes = Array.from(this.liveRecorders.keys());
       const shuffledHashes = allHashes.sort(() => 0.5 - Math.random());
 
-      const hashesToStop = shuffledHashes.slice(
-        0,
-        Math.min(randomTaskCount, allHashes.length)
-      );
+      const hashesToStop = shuffledHashes.slice(0, Math.min(randomTaskCount, allHashes.length));
 
       hashesToStop.forEach((hash) => {
         const recorder = this.liveRecorders.get(hash);
@@ -208,11 +185,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     this.diskSpaceMonitor.startMonitor();
   }
 
-  public addRoom(
-    roomId: number,
-    roomManageOptions: RoomManageOptions,
-    manualPoll = true
-  ) {
+  public addRoom(roomId: number, roomManageOptions: RoomManageOptions, manualPoll = true) {
     logger.info(`添加房间 ${roomId} 成功 ✅`);
 
     if (this.rooms.has(roomId)) {
@@ -230,11 +203,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     this.emit("new-room", roomId, client);
     logger.debug(`发射事件 new-room -> roomId: ${roomId}`);
 
-    this.installLiveMessageStreamClientEventListeners(
-      client,
-      roomId,
-      roomManageOptions
-    );
+    this.installLiveMessageStreamClientEventListeners(client, roomId, roomManageOptions);
 
     logger.info(`开始连接直播间信息流 -> ${roomId}`);
     logger.debug(`client.connect -> ${roomId}`);
@@ -243,12 +212,8 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     if (manualPoll) this.manualPoll(roomId);
   }
 
-  public batchAddRooms(
-    options: { roomId: number; roomManageOptions: RoomManageOptions }[]
-  ) {
-    options.forEach(({ roomId, roomManageOptions }) =>
-      this.addRoom(roomId, roomManageOptions, false)
-    );
+  public batchAddRooms(options: { roomId: number; roomManageOptions: RoomManageOptions }[]) {
+    options.forEach(({ roomId, roomManageOptions }) => this.addRoom(roomId, roomManageOptions, false));
 
     logger.debug("批量添加房间完成，开始拉取数据");
     this.manualPoll();
@@ -373,11 +338,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     return this.forceStopRecord(recorder, hash, allowRestart);
   }
 
-  private installLiveMessageStreamClientEventListeners(
-    client: LiveMessageStreamClient,
-    roomId: number,
-    roomManageOptions: RoomManageOptions
-  ) {
+  private installLiveMessageStreamClientEventListeners(client: LiveMessageStreamClient, roomId: number, roomManageOptions: RoomManageOptions) {
     // Install listeners
     client.on("LIVE", async () => {
       logger.debug(`房间 ${roomId} -> 触发 LIVE 事件`);
@@ -389,25 +350,15 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
       this.liveStatusMap.set(roomId, true);
 
-      const roomInfo = await this.biliAccount
-        .getBiliApi()
-        .getLiveRoomInfo(roomId);
+      const roomInfo = await this.biliAccount.getBiliApi().getLiveRoomInfo(roomId);
 
       if (roomInfo.live_status !== LiveRoomStatus.LIVE) {
-        notifyEmitter.emit(
-          "msg-error",
-          `${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}`
-        );
-        logger.error(
-          `${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}`
-        );
+        notifyEmitter.emit("msg-error", `${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}`);
+        logger.error(`${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}`);
         return;
       }
 
-      const hashs = BiliUtils.computeHash(
-        roomId,
-        new Date(roomInfo.live_time).getTime()
-      );
+      const hashs = BiliUtils.computeHash(roomId, new Date(roomInfo.live_time).getTime());
 
       this.handleLiveStart(hashs, roomInfo, roomManageOptions);
     });
@@ -428,9 +379,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
         return;
       }
 
-      const roomInfo = await this.biliAccount
-        .getBiliApi()
-        .getLiveRoomInfo(roomId);
+      const roomInfo = await this.biliAccount.getBiliApi().getLiveRoomInfo(roomId);
 
       this.handleLiveEnd({
         hash,
@@ -442,11 +391,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
   }
 
   private manualPoll(roomIds: number | number[] | null = null) {
-    const rooms = roomIds
-      ? Array.isArray(roomIds)
-        ? roomIds
-        : [roomIds]
-      : Array.from(this.rooms);
+    const rooms = roomIds ? (Array.isArray(roomIds) ? roomIds : [roomIds]) : Array.from(this.rooms);
 
     if (rooms.length === 0) return;
 
@@ -463,13 +408,8 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
             if (!this.firstFlagMap.has(roomId)) {
               logger.debug(`房间 ${roomId} -> 首次拉取(直播中)`);
             } else {
-              logger.warn(
-                `房间 ${roomId} -> LiveMessageStream 漏触发 LIVE 事件, 开始处理`
-              );
-              notifyEmitter.emit(
-                "msg-warn",
-                `[manualPoll]\n房间 ${roomId} -> LiveMessageStream 漏触发 LIVE 事件, 开始处理`
-              );
+              logger.warn(`房间 ${roomId} -> LiveMessageStream 漏触发 LIVE 事件, 开始处理`);
+              notifyEmitter.emit("msg-warn", `[manualPoll]\n房间 ${roomId} -> LiveMessageStream 漏触发 LIVE 事件, 开始处理`);
             }
             this.liveStatusMap.set(roomId, true);
 
@@ -478,65 +418,32 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
               .getLiveRoomInfo(roomId)
               .then((roomInfo) => {
                 if (roomInfo.live_status !== LiveRoomStatus.LIVE) {
-                  logger.warn(
-                    `manualPoll -> 房间 ${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`
-                  );
-                  notifyEmitter.emit(
-                    "msg-error",
-                    `[manualPoll]\n房间 ${roomId} -> manualPoll 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`
-                  );
+                  logger.warn(`manualPoll -> 房间 ${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`);
+                  notifyEmitter.emit("msg-error", `[manualPoll]\n房间 ${roomId} -> manualPoll 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`);
                   return;
                 }
 
-                const roomManageOptions =
-                  this.roomIdToRoomManageOptions.get(roomId);
+                const roomManageOptions = this.roomIdToRoomManageOptions.get(roomId);
 
                 if (!roomManageOptions) {
-                  logger.error(
-                    `无法找到 RoomId -> RoomManageOptions 的映射 -> ${roomId}`
-                  );
-                  notifyEmitter.emit(
-                    "msg-error",
-                    `[manualPoll]\n无法找到 ${roomId} -> RoomManageOptions 的映射, 触发直播通知流程中断`
-                  );
+                  logger.error(`无法找到 RoomId -> RoomManageOptions 的映射 -> ${roomId}`);
+                  notifyEmitter.emit("msg-error", `[manualPoll]\n无法找到 ${roomId} -> RoomManageOptions 的映射, 触发直播通知流程中断`);
                   return;
                 }
 
-                this.handleLiveStart(
-                  BiliUtils.computeHash(
-                    roomId,
-                    new Date(roomInfo.live_time).getTime()
-                  ),
-                  roomInfo,
-                  roomManageOptions
-                );
+                this.handleLiveStart(BiliUtils.computeHash(roomId, new Date(roomInfo.live_time).getTime()), roomInfo, roomManageOptions);
               })
               .catch((err) => {
-                logger.error(
-                  `房间 ${roomId} -> 获取直播信息失败 -> ${err}, 触发直播通知流程中断`
-                );
-                notifyEmitter.emit(
-                  "msg-error",
-                  `[manualPoll]\n房间 ${roomId} -> 获取直播信息失败 -> ${err}, 触发直播通知流程中断`
-                );
+                logger.error(`房间 ${roomId} -> 获取直播信息失败 -> ${err}, 触发直播通知流程中断`);
+                notifyEmitter.emit("msg-error", `[manualPoll]\n房间 ${roomId} -> 获取直播信息失败 -> ${err}, 触发直播通知流程中断`);
               });
-          } else if (
-            roomInfo.live_status === LiveRoomStatus.SLIDESHOW ||
-            roomInfo.live_status === LiveRoomStatus.END
-          ) {
+          } else if (roomInfo.live_status === LiveRoomStatus.SLIDESHOW || roomInfo.live_status === LiveRoomStatus.END) {
             if (this.liveStatusMap.get(roomId) === false) return; // 已经被 LiveMessageStream 通知过
             if (!this.firstFlagMap.has(roomId)) {
-              logger.debug(
-                `WARN: 房间 ${roomId} -> 首次拉取(轮播/关播)，不存在开播时的直播数据`
-              );
+              logger.debug(`WARN: 房间 ${roomId} -> 首次拉取(轮播/关播)，不存在开播时的直播数据`);
             } else {
-              logger.warn(
-                `房间 ${roomId} -> LiveMessageStream 漏触发 PREPARING 事件, 开始处理`
-              );
-              notifyEmitter.emit(
-                "msg-warn",
-                `[manualPoll]\n房间 ${roomId} -> LiveMessageStream 漏触发 PREPARING 事件, 开始处理`
-              );
+              logger.warn(`房间 ${roomId} -> LiveMessageStream 漏触发 PREPARING 事件, 开始处理`);
+              notifyEmitter.emit("msg-warn", `[manualPoll]\n房间 ${roomId} -> LiveMessageStream 漏触发 PREPARING 事件, 开始处理`);
             }
             this.liveStatusMap.set(roomId, false);
 
@@ -545,27 +452,16 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
               .getLiveRoomInfo(roomId)
               .then((roomInfo) => {
                 if (roomInfo.live_status === LiveRoomStatus.LIVE) {
-                  logger.warn(
-                    `manualPoll -> 房间 ${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`
-                  );
-                  notifyEmitter.emit(
-                    "msg-error",
-                    `[manualPoll]\n房间 ${roomId} -> manualPoll 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`
-                  );
+                  logger.warn(`manualPoll -> 房间 ${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`);
+                  notifyEmitter.emit("msg-error", `[manualPoll]\n房间 ${roomId} -> manualPoll 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`);
                   return;
                 }
 
-                const roomManageOptions =
-                  this.roomIdToRoomManageOptions.get(roomId);
+                const roomManageOptions = this.roomIdToRoomManageOptions.get(roomId);
 
                 if (!roomManageOptions) {
-                  logger.error(
-                    `无法找到 RoomId -> RoomManageOptions 的映射 -> ${roomId}, 触发直播结束通知流程中断`
-                  );
-                  notifyEmitter.emit(
-                    "msg-error",
-                    `[manualPoll]\n无法找到 ${roomId} -> RoomManageOptions 的映射, 触发直播结束通知流程中断`
-                  );
+                  logger.error(`无法找到 RoomId -> RoomManageOptions 的映射 -> ${roomId}, 触发直播结束通知流程中断`);
+                  notifyEmitter.emit("msg-error", `[manualPoll]\n无法找到 ${roomId} -> RoomManageOptions 的映射, 触发直播结束通知流程中断`);
                   return;
                 }
 
@@ -577,22 +473,12 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
                 });
               })
               .catch((err) => {
-                logger.error(
-                  `房间 ${roomId} -> 获取直播信息失败 -> ${err}, 触发直播结束通知流程中断`
-                );
-                notifyEmitter.emit(
-                  "msg-error",
-                  `[manualPoll]\n房间 ${roomId} -> 获取直播信息失败 -> ${err}, 触发直播结束通知流程中断`
-                );
+                logger.error(`房间 ${roomId} -> 获取直播信息失败 -> ${err}, 触发直播结束通知流程中断`);
+                notifyEmitter.emit("msg-error", `[manualPoll]\n房间 ${roomId} -> 获取直播信息失败 -> ${err}, 触发直播结束通知流程中断`);
               });
           } else {
-            notifyEmitter.emit(
-              "msg-error",
-              `[manualPoll]\n房间 ${roomId} -> 直播状态未知, API: ${roomInfo.live_status}`
-            );
-            logger.error(
-              `${roomId} -> 直播状态未知, API: ${roomInfo.live_status}`
-            );
+            notifyEmitter.emit("msg-error", `[manualPoll]\n房间 ${roomId} -> 直播状态未知, API: ${roomInfo.live_status}`);
+            logger.error(`${roomId} -> 直播状态未知, API: ${roomInfo.live_status}`);
           }
         }
       })
@@ -601,11 +487,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       });
   }
 
-  private async handleLiveStart(
-    { hash, sessionHash }: { hash: string; sessionHash: string },
-    roomInfo: LiveRoomInfo,
-    roomManageOptions: RoomManageOptions
-  ) {
+  private async handleLiveStart({ hash, sessionHash }: { hash: string; sessionHash: string }, roomInfo: LiveRoomInfo, roomManageOptions: RoomManageOptions) {
     const roomId = roomInfo.room_id;
 
     this.hashToRoomInfoMap.set(hash, {
@@ -624,9 +506,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
     const isFirst = !this.firstFlagMap.has(roomId);
 
-    logger.debug(
-      `发射事件 live-start -> roomId: ${roomId}, hash: ${hash}, isFirst: ${isFirst}`
-    );
+    logger.debug(`发射事件 live-start -> roomId: ${roomId}, hash: ${hash}, isFirst: ${isFirst}`);
     this.emit("live-start", { roomId, hash, roomInfo, isFirst });
 
     if (isFirst) {
@@ -639,9 +519,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     } else {
       logger.info(`房间 ${roomId} 准备录制`);
 
-      const inputUrls = await this.biliAccount
-        .getBiliApi()
-        .getLiveStreamUrl(roomId);
+      const inputUrls = await this.biliAccount.getBiliApi().getLiveStreamUrl(roomId);
       const inputUrl = inputUrls[0];
       const recordingDir = appConfigManager.get("recordingDir");
       const recorder = new LiveRecorder({
@@ -657,9 +535,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
           this.recordTimeouts.set(
             hash,
             setTimeout(() => {
-              logger.warn(
-                `录制任务 ${hash} 超过最大录制时长限制, 尝试强制停止录制任务`
-              );
+              logger.warn(`录制任务 ${hash} 超过最大录制时长限制, 尝试强制停止录制任务`);
 
               this.forceStopRecord(recorder, hash, true)
                 .then(() => {
@@ -685,16 +561,12 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
           .getBiliApi()
           .getLiveRoomInfo(roomId)
           .then((roomInfo) => {
-            logger.info(
-              `收到 LiveRecorder.${hash} 录制完成 事件, 开始检查是否未异常结束`
-            );
+            logger.info(`收到 LiveRecorder.${hash} 录制完成 事件, 开始检查是否未异常结束`);
             if (roomInfo.live_status === LiveRoomStatus.LIVE) {
               logger.info(`${hash} 录制为异常结束`);
               recorder.retryRecord();
             } else {
-              logger.debug(
-                `${hash} 录制为正常结束, 由 handleLiveEnd 处理剩余事务`
-              );
+              logger.debug(`${hash} 录制为正常结束, 由 handleLiveEnd 处理剩余事务`);
             }
           });
       });
@@ -730,12 +602,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     }
   }
 
-  private async handleLiveEnd(options: {
-    hash: string | null;
-    roomId: number;
-    liveEndRoomInfo: LiveRoomInfo;
-    roomManageOptions: RoomManageOptions;
-  }) {
+  private async handleLiveEnd(options: { hash: string | null; roomId: number; liveEndRoomInfo: LiveRoomInfo; roomManageOptions: RoomManageOptions }) {
     const { hash, roomId, liveEndRoomInfo, roomManageOptions } = options;
 
     if (!this.firstFlagMap.has(roomId)) {
@@ -797,9 +664,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
         await lock;
         logger.debug(`${hash} 的hashLock 已解锁🔓，继续LiveEnd事务`);
       } else {
-        logger.debug(
-          `hash ${hash} 正在被处理中，却不存在HashLock，说明可能处理已结束但标记未清除`
-        );
+        logger.debug(`hash ${hash} 正在被处理中，却不存在HashLock，说明可能处理已结束但标记未清除`);
       }
       this.processingHashes.delete(hash);
     }
@@ -828,16 +693,13 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
         return;
       }
 
-      logger.info(
-        `房间 ${roomId} 开始停止录制, ${hash} 录制器 -> stopRecord()`
-      );
+      logger.info(`房间 ${roomId} 开始停止录制, ${hash} 录制器 -> stopRecord()`);
 
       if (!recorder.isRunning()) {
         logger.debug(`WARN: ${hash} 的录制器未在录制`);
       }
 
-      const customOptions =
-        liveConfigManager.get("rooms")[roomId]?.uploadOptions;
+      const customOptions = liveConfigManager.get("rooms")[roomId]?.uploadOptions;
 
       try {
         const resp = await recorder.stopRecordAndMerge();
@@ -849,7 +711,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
             return await this.upload({
               hash,
               file: resp.file,
-              roomInfo: liveEndRoomInfo,
+              roomInfo: liveStartRoomInfo,
               live: {
                 startTime: liveStartTime,
                 stopTime: liveStopTime,
@@ -914,9 +776,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
         this.clearRecording(hash, false);
 
         // Recorder 的生命结束
-        logger.debug(
-          `录制器 ${hash} 的生命已结束，由于投稿失败，资源暂未清理 ⌛️`
-        );
+        logger.debug(`录制器 ${hash} 的生命已结束，由于投稿失败，资源暂未清理 ⌛️`);
       }
 
       logger.debug("handleLiveEnd -> 完成");
@@ -930,9 +790,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
   private async upload(options: UploadOptions) {
     const { hash, file, roomInfo, live, recorder, customOptions } = options;
     logger.debug(`采用投稿账号 -> ${customOptions?.account || "默认账号"}`);
-    const biliAccount = customOptions?.account
-      ? BiliAccountService.getBiliAccount(customOptions.account)
-      : this.biliAccount;
+    const biliAccount = customOptions?.account ? BiliAccountService.getBiliAccount(customOptions.account) : this.biliAccount;
 
     if (!biliAccount) {
       throw new CustomBiliAccountNotFound();
@@ -944,9 +802,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
     // if (!live.startTime) throw new Error("开播时间未知");
 
-    const session = live.startTime
-      ? FormatUtils.formatDateWithSession(new Date(live.startTime))
-      : "";
+    const session = live.startTime ? FormatUtils.formatDateWithSession(new Date(live.startTime)) : "";
 
     const title = `【${userName}】${session} - ${roomInfo.title}`;
 
@@ -954,32 +810,12 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       `UP主: ${userName}\n` +
       `https://space.bilibili.com/${roomInfo.uid}\n\n` +
       `场次: ${session}\n` +
-      `开播时间: ${
-        live.startTime ? FormatUtils.formatDateTime(live.startTime) : "未知"
-      }\n` +
-      `结束直播: ${
-        live.stopTime ? FormatUtils.formatDateTime(live.stopTime) : "未知"
-      }\n` +
-      `直播时长: ${
-        live.duration
-          ? FormatUtils.formatDurationWithoutSeconds(live.duration)
-          : "未知"
-      }\n\n` +
-      `开始录制: ${
-        recorder.startTime
-          ? FormatUtils.formatDateTime(recorder.startTime)
-          : "未知"
-      }\n` +
-      `结束录制: ${
-        recorder.stopTime
-          ? FormatUtils.formatDateTime(recorder.stopTime)
-          : "未知"
-      }\n` +
-      `录制时长: ${
-        recorder.duration
-          ? FormatUtils.formatDurationWithoutSeconds(recorder.duration)
-          : "未知"
-      }\n\n` +
+      `开播时间: ${live.startTime ? FormatUtils.formatDateTime(live.startTime) : "未知"}\n` +
+      `结束直播: ${live.stopTime ? FormatUtils.formatDateTime(live.stopTime) : "未知"}\n` +
+      `直播时长: ${live.duration ? FormatUtils.formatDurationWithoutSeconds(live.duration) : "未知"}\n\n` +
+      `开始录制: ${recorder.startTime ? FormatUtils.formatDateTime(recorder.startTime) : "未知"}\n` +
+      `结束录制: ${recorder.stopTime ? FormatUtils.formatDateTime(recorder.stopTime) : "未知"}\n` +
+      `录制时长: ${recorder.duration ? FormatUtils.formatDurationWithoutSeconds(recorder.duration) : "未知"}\n\n` +
       `直播间标题: ${roomInfo.title}\n` +
       `直播间简介: ${roomInfo.description || "无"}\n` +
       `直播间地址: https://live.bilibili.com/${roomInfo.room_id}\n` +
@@ -1013,11 +849,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     return resp;
   }
 
-  private async forceStopRecord(
-    recorder: LiveRecorder,
-    hash: string,
-    allowRestart = true
-  ) {
+  private async forceStopRecord(recorder: LiveRecorder, hash: string, allowRestart = true) {
     logger.debug(`${hash} -> 任务开始强制结束`);
 
     let resolveLock: (() => void) | undefined;
@@ -1051,10 +883,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
       try {
         if (!roomConfig) throw new Error(`未找到房间 ${roomId} 的配置文件`);
-        if (typeof roomConfig.autoUpload !== "boolean")
-          throw new Error(
-            `房间 ${roomId} 的配置文件可以已经损坏, autoUpload 非逻辑值`
-          );
+        if (typeof roomConfig.autoUpload !== "boolean") throw new Error(`房间 ${roomId} 的配置文件可以已经损坏, autoUpload 非逻辑值`);
         shouldUpload = roomConfig.autoUpload;
       } catch (e) {
         logger.error((e as Error).message);
@@ -1063,9 +892,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       if (shouldUpload) {
         const resp = await recorder.stopRecordAndMerge();
         // 手动获取直播间信息
-        const roomInfo = await this.biliAccount
-          .getBiliApi()
-          .getLiveRoomInfo(roomId);
+        const roomInfo = await this.biliAccount.getBiliApi().getLiveRoomInfo(roomId);
 
         const liveStartTime = new Date(roomInfo.live_time).getTime();
 
@@ -1142,11 +969,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     }
 
     if (this.hashToRoomInfoMap.has(hash)) {
-      logger.debug(
-        `已删除 Hash -> RoomInfo 映射: ${hash} -> ${this.hashToRoomInfoMap.get(
-          hash
-        )}`
-      );
+      logger.debug(`已删除 Hash -> RoomInfo 映射: ${hash} -> ${this.hashToRoomInfoMap.get(hash)}`);
       this.hashToRoomInfoMap.delete(hash);
     }
 
