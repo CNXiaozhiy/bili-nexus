@@ -78,16 +78,15 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     this._killWatchdog();
 
     this.watchdogTimeout = setInterval(() => {
-      if (!this.ffmpegStats) {
-        this._killWatchdog();
-        this.logger.debug("[Watchdog]", "killed Watchdog");
-        return;
-      }
-      if (!this.ffmpegStats || this.lastProgress === this.ffmpegStats.time) {
+      if (!this.ffmpegStats || !this.ffmpegStats.time || this.lastProgress === this.ffmpegStats.time) {
         if (!this.ffmpegStats) {
           this.logger.warn("[Watchdog]", "无法获取到录制进程FfmpegStats❌❌，可能已经卡死，准备结束分段");
         } else {
           this.logger.warn("[Watchdog]", "检测到录制进程长时间未响应❌，可能已经卡死，准备结束分段");
+        }
+
+        if (this.ffmpegStats && !this.ffmpegStats?.time) {
+          this.logger.debug("[Watchdog]", "ffmpegStats存在, 无法获取到录制进程FfmpegStats.time");
         }
 
         this.logger.debug("[Watchdog]", "当前预备分段文件", this._readySegmentFile);
@@ -129,7 +128,11 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
           this.logger.warn("[Watchdog]", "尝试安全结束录制进程");
           this.recFfmpeg.stop();
         }
+
+        return;
       }
+
+      this.lastProgress = this.ffmpegStats.time;
     }, LiveRecorder.WATCHDOG_CHECK_INTERVAL);
   }
 
@@ -172,8 +175,6 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
         this.logger.debug("录制进程返回数据缺失", stats);
         return;
       }
-
-      this.lastProgress = stats.time;
 
       if (!this.ffmpegStats) {
         this.logger.info("录制真正开始✅ 🔴REC");
