@@ -27,15 +27,7 @@ type FilePath = string;
 type MessageType = "private" | "group";
 type Sex = "male" | "female" | "unknown";
 type GroupRole = "owner" | "admin" | "member";
-type SupportedFormat =
-  | "mp3"
-  | "amr"
-  | "wma"
-  | "m4a"
-  | "spx"
-  | "ogg"
-  | "wav"
-  | "flac";
+type SupportedFormat = "mp3" | "amr" | "wma" | "m4a" | "spx" | "ogg" | "wav" | "flac";
 type Device = { app_id: number; device_name: string; device_kind: string };
 type Sender = { nickname: string; user_id: QQNumber };
 type FileUpload = { id: FileID; name: string; size: number; busid: number };
@@ -69,10 +61,7 @@ export type _GroupHonorInfo = {
   description: string;
 };
 
-export type GroupHonorInfo_CurrentTalkative = Exclude<
-  _GroupHonorInfo,
-  "description"
-> & {
+export type GroupHonorInfo_CurrentTalkative = Exclude<_GroupHonorInfo, "description"> & {
   day_count: number;
 };
 export type GroupHonorInfo_TalkativeList = _GroupHonorInfo[];
@@ -208,10 +197,7 @@ export interface ActionMap {
     resp: { message_id: MessageID };
   };
   send_msg: {
-    params: { message_type?: MessageType } & (
-      | { user_id: QQNumber; message: Messages; auto_escape?: boolean }
-      | { group_id: QQNumber; message: Messages; auto_escape?: boolean }
-    );
+    params: { message_type?: MessageType } & ({ user_id: QQNumber; message: Messages; auto_escape?: boolean } | { group_id: QQNumber; message: Messages; auto_escape?: boolean });
     resp: { message_id: MessageID };
   };
   get_msg: {
@@ -310,13 +296,7 @@ export interface ActionMap {
   get_group_honor_info: {
     params: {
       group_id: QQNumber;
-      type:
-        | "talkative"
-        | "performer"
-        | "legend"
-        | "strong_newbie"
-        | "emotion"
-        | "all";
+      type: "talkative" | "performer" | "legend" | "strong_newbie" | "emotion" | "all";
     };
     resp: {
       group_id: QQNumber;
@@ -477,6 +457,21 @@ export interface ActionMap {
     };
     resp: { ok: boolean };
   };
+
+  get_mini_app_ark: {
+    params: {
+      type: "bili" | "weibo";
+      title: string;
+      desc: string;
+      picUrl: string;
+      jumpUrl: string;
+      webUrl?: string;
+      rawArkData?: boolean;
+    };
+    resp: {
+      data: any; // ARK
+    };
+  };
 }
 
 export interface SegmentMessageMap {
@@ -494,16 +489,13 @@ export interface SegmentMessageMap {
   share: { url: string; title: string; content?: string; image?: string };
   contact: { type: "qq"; id: QQNumber } | { type: "group"; id: QQNumber };
   location: { lat: string; lon: string };
-  music:
-    | { type: "qq" | "163" | "xm"; id: string }
-    | { type: "custom"; url: string; audio: string; title: string };
+  music: { type: "qq" | "163" | "xm"; id: string } | { type: "custom"; url: string; audio: string; title: string };
   reply: { id: MessageID };
   forward: { id: ForwardMessageID };
-  node:
-    | { id: MessageID }
-    | { user_id: QQNumber; nickname: string; content: Messages };
+  node: { id: MessageID } | { user_id: QQNumber; nickname: string; content: Messages };
   xml: { data: string };
   json: { data: string };
+  miniapp: { data: string };
 }
 
 export type ForwardNodes = SegmentMessageMap["node"][];
@@ -548,19 +540,12 @@ interface BaseFailedResponse {
   wording: string;
 }
 
-type BaseResponse<T> =
-  | BaseOkResponse<T>
-  | BaseAsyncResponse
-  | BaseFailedResponse;
+type BaseResponse<T> = BaseOkResponse<T> | BaseAsyncResponse | BaseFailedResponse;
 
 export type Actions = keyof ActionMap;
 export type ActionParams<A extends Actions> = ActionMap[A]["params"];
-export type ActionResponse<A extends keyof ActionMap> = BaseResponse<
-  ActionMap[A]["resp"]
->;
-export type ActionOkResponse<A extends keyof ActionMap> = BaseOkResponse<
-  ActionMap[A]["resp"]
->;
+export type ActionResponse<A extends keyof ActionMap> = BaseResponse<ActionMap[A]["resp"]>;
+export type ActionOkResponse<A extends keyof ActionMap> = BaseOkResponse<ActionMap[A]["resp"]>;
 
 export type ActionPayload<A extends Actions> = {
   action: A;
@@ -827,13 +812,7 @@ export type RelayEvent = {
   message: string;
 };
 
-export type Events =
-  | RelayEvent
-  | MessageEvent
-  | MessageSentEvent
-  | RequestEvent
-  | NoticeEvent
-  | MetaEvent;
+export type Events = RelayEvent | MessageEvent | MessageSentEvent | RequestEvent | NoticeEvent | MetaEvent;
 
 // Utils
 
@@ -849,5 +828,11 @@ export class OneBotMessageUtils {
   }
   static Base64Image(base64: string): SegmentMessage {
     return { type: "image", data: { file: `base64://${base64}` } };
+  }
+  static MiniApp(data: any): SegmentMessage {
+    return { type: "miniapp", data: { data } };
+  }
+  static Json(data: string): SegmentMessage {
+    return { type: "json", data: { data } };
   }
 }

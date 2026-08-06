@@ -39,10 +39,7 @@ export interface XzQBotEvents {
   event: [data: { e: OneBot.Events }];
   message: [e: OneBot.MessageEvent, reply: ReplyFunction<OneBot.ActionOkResponse<"send_group_msg"> | OneBot.ActionOkResponse<"send_private_msg">>];
   group_message: [e: OneBot.GroupMessageEvent | OneBot.GroupMessageSentEvent, reply: ReplyFunction<OneBot.ActionOkResponse<"send_group_msg">>];
-  private_message: [
-    e: OneBot.PrivateMessageEvent | OneBot.PrivateMessageSentEvent,
-    reply: ReplyFunction<OneBot.ActionOkResponse<"send_private_msg">>
-  ];
+  private_message: [e: OneBot.PrivateMessageEvent | OneBot.PrivateMessageSentEvent, reply: ReplyFunction<OneBot.ActionOkResponse<"send_private_msg">>];
   group_recall: [e: OneBot.GroupMessageRecallNoticeEvent, message_id: OneBot.MessageID];
 }
 
@@ -306,5 +303,13 @@ export default class XzQBot extends AbsXzQBot {
       action: "get_group_member_list",
       params: { group_id },
     });
+  }
+
+  deleteMsg(message_id: OneBot.MessageID) {
+    return this._action({ action: "delete_msg", params: { message_id } });
+  }
+
+  getMiniAppArk(type: "bili" | "weibo", title: string, desc: string, picUrl: string, jumpUrl: string, webUrl?: string) {
+    return this._action({ action: "get_mini_app_ark", params: { type, title, desc, picUrl, jumpUrl, webUrl } });
   }
 }
