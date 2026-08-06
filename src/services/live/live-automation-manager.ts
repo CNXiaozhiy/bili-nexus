@@ -4,7 +4,7 @@ import LiveRecorder from "@/core/bilibili/live/live-recorder";
 import { appConfigManager, biliConfigManager, liveConfigManager } from "@/common";
 import BiliAccountService from "../account/bili-account-service";
 import getLogger from "@/utils/logger";
-import { LiveRoomInfo, LiveRoomStatus, UserCard } from "@/types/bilibili";
+import { LiveRoomInfo, LiveRoomStatus, OpenState, UserCard } from "@/types/bilibili";
 import { UploadOptions as CustomOptions } from "@/common/config";
 import BiliUtils from "@/utils/bili";
 import DiskSpaceMonitor from "@/core/disk/disk-space-monitor";
@@ -13,6 +13,7 @@ import VideoUploader from "@/core/bilibili/video/video-uploader";
 import FormatUtils from "@/utils/format";
 import { getVersion } from "../version";
 import { BiliAccount } from "@/core/bilibili/bili-account";
+import fs from "fs";
 
 const logger = getLogger("LiveAutomationManager");
 
@@ -703,6 +704,10 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
       try {
         const resp = await recorder.stopRecordAndMerge();
+        const { file } = resp;
+
+        const fileStat = fs.statSync(file);
+        logger.debug(`房间 ${roomId}.${hash} 最终录制文件大小:`, fileStat.size);
 
         if (roomManageOptions.autoUpload) {
           logger.info(`房间 ${roomId} 开始自动投稿`);
@@ -729,6 +734,22 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
           try {
             const resp = await submissionFunc();
             logger.info(`房间 ${roomId} 自动投稿成功✅`, resp);
+
+            resp.tracker.once("open", () => {
+              this.clearRecording(hash, true);
+
+              try {
+                if (fs.existsSync(file)) {
+                  fs.unlinkSync(file);
+                }
+
+                logger.info(`审核通过，录制器 ${hash} 录制文件已清理 🧹`);
+              } catch (e) {
+                logger.error(`清理 ${hash} 的录制文件失败❌`, e);
+              }
+            });
+
+            logger.debug(`投稿成功，房间 ${roomId} 的录制器 ${hash} 会在视频审核通过后自动清理 once(open)`);
           } catch (e) {
             logger.debug(`房间 ${roomId} 自动投稿失败❌, 已创建重投函数`);
             this.failedSubmission.set(hash, submissionFunc);
@@ -740,10 +761,8 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
           logger.info(`房间 ${roomId} 自动投稿已禁用, 投稿已取消`);
         }
 
-        this.clearRecording(hash, roomManageOptions.autoUpload);
-
         // Recorder 的生命结束
-        logger.debug(`录制器 ${hash} 的生命已结束，资源已清理 🧹`);
+        logger.debug(`录制器 ${hash} 的生命已结束`);
       } catch (e) {
         logger.error("停止录制或投稿失败 ❌", e);
 

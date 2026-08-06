@@ -7,6 +7,8 @@ export default class VideoTracker extends EventEmitter<{
   auditStateChange: [AuditState: AuditState, lastAuditState: AuditState | null, detail: VideoDetailAudit];
   auditAegisStateChange: [AegisState: AuditAegisState, lastAegisState: AuditAegisState | null, detail: VideoDetailAudit];
   openStateChange: [OpenState: OpenState, lastOpenState: OpenState | null];
+
+  open: [];
 }> {
   private logger;
   private biliApi;
@@ -60,6 +62,8 @@ export default class VideoTracker extends EventEmitter<{
       if (this.lastOpenState !== archiveDetail.open_state) {
         // 状态变化
         this.logger.debug(`open_state 变化: ${this.lastOpenState} -> ${archiveDetail.open_state}`, archiveDetail);
+
+        if ((archiveDetail.open_state = OpenState.OPENED)) this.emit("open");
 
         this.emit("openStateChange", archiveDetail.open_state, this.lastOpenState);
 

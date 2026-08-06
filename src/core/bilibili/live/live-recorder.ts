@@ -22,7 +22,6 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
   public static MAX_RETRY_DELAY: number = 120000;
   public static MAX_RETRY_COUNT: number = Infinity;
   public static WATCHDOG_CHECK_INTERVAL: number = 30000;
-  public static WATCHDOG_HEARTBEAT_TIMEOUT: number = 60000;
 
   private logger;
 
@@ -48,8 +47,9 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
   private ffmpegStats: FfmpegStats | null = null;
 
   // Watchdog
-  private lastProgressHeartbeat: number = 0;
+  private lastProgress: string = "";
   private watchdogTimeout: NodeJS.Timeout | null = null;
+  private _readySegmentFile = ""; // 当前正在尝试录制的文件（可能已经创建、也可能未创建）
 
   private retryTimeout: NodeJS.Timeout | null = null;
 
@@ -78,8 +78,20 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     this._killWatchdog();
 
     this.watchdogTimeout = setInterval(() => {
-      if (Date.now() - this.lastProgressHeartbeat > LiveRecorder.WATCHDOG_HEARTBEAT_TIMEOUT) {
-        this.logger.warn("[Watchdog]", "检测到录制进程长时间未响应❌，可能已经卡死，准备结束分段");
+      if (!this.ffmpegStats) {
+        this._killWatchdog();
+        this.logger.debug("[Watchdog]", "killed Watchdog");
+        return;
+      }
+      if (!this.ffmpegStats || this.lastProgress === this.ffmpegStats.time) {
+        if (!this.ffmpegStats) {
+          this.logger.warn("[Watchdog]", "无法获取到录制进程FfmpegStats❌❌，可能已经卡死，准备结束分段");
+        } else {
+          this.logger.warn("[Watchdog]", "检测到录制进程长时间未响应❌，可能已经卡死，准备结束分段");
+        }
+
+        this.logger.debug("[Watchdog]", "当前预备分段文件", this._readySegmentFile);
+
         this._killWatchdog();
         this.logger.debug("[Watchdog]", "killed Watchdog");
 
@@ -129,11 +141,6 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
     this._checkIfDestroyed();
     const isFirst = this.startTime === 0;
 
-    if (isFirst) {
-      this.logger.debug(`第一次录制开始, startTime 将被设置`);
-      this.startTime = Date.now();
-    }
-
     const filePath = this.generateNewFilePath(this.getSegmentFilesCount());
 
     this.ffmpegStats = null;
@@ -153,7 +160,10 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
       this.logger.info(`${this.hash.substring(0, 32)} -> 分段[${this.getSegmentFilesCount()}] 即将开始录制 ⏳`);
       this.emit("start", isFirst);
 
-      this.logger.info("看门狗已启动✅");
+      this._readySegmentFile = filePath;
+      this.logger.debug("readySegmentFile 设置成功", this._readySegmentFile);
+
+      this.logger.info("看门狗已启动🐶");
       this._runWatchdog();
     });
 
@@ -163,10 +173,15 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
         return;
       }
 
-      this.lastProgressHeartbeat = Date.now();
+      this.lastProgress = stats.time;
 
       if (!this.ffmpegStats) {
         this.logger.info("录制真正开始✅ 🔴REC");
+
+        if (isFirst) {
+          this.logger.debug(`第一次录制开始, startTime 将被设置`);
+          this.startTime = Date.now();
+        }
 
         if (!fs.existsSync(filePath)) {
           this.logger.warn("异常行为：录制文件不存在❌", filePath);
@@ -184,7 +199,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
       this.ffmpegRunning = false;
       this.logger.info(`${this.hash.substring(0, 32)} -> ffmpeg 退出 ❌, code:`, code);
 
-      this.logger.debug("看门狗已 Killed✅");
+      this.logger.debug("看门狗🐶 Killed✅");
       this._killWatchdog();
 
       // 检查录制是否成功
