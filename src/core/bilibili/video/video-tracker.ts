@@ -63,7 +63,7 @@ export default class VideoTracker extends EventEmitter<{
         // 状态变化
         this.logger.debug(`open_state 变化: ${this.lastOpenState} -> ${archiveDetail.open_state}`, archiveDetail);
 
-        if ((archiveDetail.open_state = OpenState.OPENED)) this.emit("open");
+        if (archiveDetail.open_state === OpenState.OPENED) this.emit("open");
 
         this.emit("openStateChange", archiveDetail.open_state, this.lastOpenState);
 
