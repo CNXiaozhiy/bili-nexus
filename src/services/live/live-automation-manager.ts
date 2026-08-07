@@ -736,7 +736,6 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
             logger.info(`房间 ${roomId} 自动投稿成功✅`, resp);
 
             resp.tracker.once("open", () => {
-              this.clearRecording(hash, true);
 
               try {
                 if (fs.existsSync(file)) {
@@ -750,6 +749,10 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
             });
 
             logger.debug(`投稿成功，房间 ${roomId} 的录制器 ${hash} 会在视频审核通过后自动清理 once(open)`);
+
+            this.clearRecording(hash, false);
+            logger.info(`录制器 ${hash} 生命已结束, 录制器已清理 🧹`);
+
           } catch (e) {
             logger.debug(`房间 ${roomId} 自动投稿失败❌, 已创建重投函数`);
             this.failedSubmission.set(hash, submissionFunc);
