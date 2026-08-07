@@ -865,6 +865,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
     });
 
     const resp = await uploader.upload();
+    resp.tracker.start();
     return resp;
   }
 
