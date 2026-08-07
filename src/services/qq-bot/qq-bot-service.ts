@@ -1631,87 +1631,73 @@ export default class QQBotService {
           });
         }, 60 * 60 * 1000);
 
-        tracker.start();
-        tracker.on("auditStateChange", async (newState, lastState, detail) => {
-          if (newState === AuditState.OPEN) {
-            Object.entries(notifyGroups).forEach(async ([gid, group]) => {
-              if (!this.bot) {
-                logger.error("机器人实例对象不存在！");
-                return;
-              }
-              await this.bot.sendGroup(parseInt(gid), [OneBotMessageUtils.Text(`录播审核已通过✅\n` + `hash: ${hash.substring(0, 7)}\n\n` + `视频地址: \nhttps://www.bilibili.com/video/${bvid}`)]);
+        tracker.on("open", async () => {
+          logger.debug("视频审核通过, 开始通知群组");
 
-              logger.debug(`群聊通知完成✅ -> Group ${gid}`);
-            });
+          Object.entries(notifyGroups).forEach(async ([gid, group]) => {
+            if (!this.bot) {
+              logger.error("机器人实例对象不存在！");
+              return;
+            }
+            await this.bot.sendGroup(parseInt(gid), [OneBotMessageUtils.Text(`录播审核已通过✅\n` + `hash: ${hash.substring(0, 7)}\n\n` + `视频地址: \nhttps://www.bilibili.com/video/${bvid}`)]);
 
-            logger.debug("视频审核通过, 停止继续追踪");
+            logger.debug(`群聊通知完成✅ -> Group ${gid}`);
+          });
 
-            tracker.stop();
+          clearTimeout(trackerTimeOut);
+        });
+
+        tracker.on("fail", async (auditState, ageisState, problemDetail) => {
+          let message = `录播转码审核未通过❌\n` + `hash: ${hash.substring(0, 7)}\n\n` + `状态：`;
+
+          if (auditState === AuditState.TRANSCODE_FAIL) {
+            logger.debug("视频转码失败， 销毁Tracker");
+            tracker.destroy();
             clearTimeout(trackerTimeOut);
-          } else if (
-            newState !== AuditState.SUBMITTED &&
-            newState !== AuditState.SCHEDULED &&
-            newState !== AuditState.DELAY &&
-            newState !== AuditState.PENDING &&
-            newState !== AuditState.TRANSCODING &&
-            newState !== AuditState.UNKNOWN_60
-          ) {
-            logger.error("视频状态异常❌, 当前状态:", newState);
-            notifyEmitter.emit("msg-warn", `${bvid} 视频状态异常❌, 当前状态: ${newState}\n视频地址: https://www.bilibili.com/video/${bvid}\n\n暂未停止追踪`);
 
-            // tracker.stop();
+            // 视频稿件问题
+            message += "转码失败❌";
+            const xcodeDetails = await tracker.getXcodeState();
 
-            let message = `录播转码审核未通过❌\n` + `hash: ${hash.substring(0, 7)}\n\n` + `状态：`;
-
-            if (newState === AuditState.TRANSCODE_FAIL) {
-              logger.debug("视频转码失败， 销毁Tracker");
-              tracker.destroy();
-              clearTimeout(trackerTimeOut);
-
-              // 视频稿件问题
-              message += "转码失败❌";
-              const xcodeDetails = await tracker.getXcodeState();
-
-              xcodeDetails.forEach((detail, index) => {
-                message += `\n\n视频 ${index + 1} 问题: ${detail.fail_tip || "无"}`;
-              });
+            xcodeDetails.forEach((detail, index) => {
+              message += `\n\n视频 ${index + 1} 问题: ${detail.fail_tip || "无"}`;
+            });
+          } else {
+            // 审核问题
+            if (ageisState === AuditAegisState.REJECT) {
+              // 这里使用 aegis_state 是因为哔哩哔哩web官方使用的就是aegis_state
+              message += "已退回⛔";
+            } else if (ageisState === AuditAegisState.LIMITED) {
+              message += "流量受影响📉";
+            } else if (ageisState === AuditAegisState.LOCKED) {
+              message += "已锁定🔒";
             } else {
-              // 审核问题
-              if (detail.aegis_state === AuditAegisState.REJECT) {
-                // 这里使用 aegis_state 是因为哔哩哔哩web官方使用的就是aegis_state
-                message += "已退回⛔";
-              } else if (detail.aegis_state === AuditAegisState.LIMITED) {
-                message += "流量受影响📉";
-              } else if (detail.aegis_state === AuditAegisState.LOCKED) {
-                message += "已锁定🔒";
-              } else {
-                message += "未知状态❓";
-              }
-
-              if (!detail.problem_detail || detail.problem_detail.length === 0) {
-                message += "\n\n问题详情：未知";
-              } else {
-                detail.problem_detail.forEach((detail, index) => {
-                  message += `\n\n稿件问题 ${index + 1}:\n${detail.reject_reason}\n\n`;
-                  message += `违规时间点: ${detail.violation_time || "无"}\n\n`;
-                  message += `违规位置: ${detail.violation_position || "无"}\n\n`;
-                  message += `修改建议:\n${detail.modify_advise}`;
-                });
-              }
+              message += "未知状态❓";
             }
 
-            message += "\n\nBN SYSTEM";
-
-            Object.entries(notifyGroups).forEach(async ([gid, group]) => {
-              if (!this.bot) {
-                logger.error("机器人实例对象不存在！");
-                return;
-              }
-              await this.bot.sendGroup(parseInt(gid), [OneBotMessageUtils.Text(message)]);
-
-              logger.debug(`群聊通知完成✅ -> Group ${gid}`);
-            });
+            if (!problemDetail || problemDetail.length === 0) {
+              message += "\n\n问题详情：未知";
+            } else {
+              problemDetail.forEach((detail, index) => {
+                message += `\n\n稿件问题 ${index + 1}:\n${detail.reject_reason}\n\n`;
+                message += `违规时间点: ${detail.violation_time || "无"}\n\n`;
+                message += `违规位置: ${detail.violation_position || "无"}\n\n`;
+                message += `修改建议:\n${detail.modify_advise}`;
+              });
+            }
           }
+
+          message += "\n\nBN SYSTEM";
+
+          Object.entries(notifyGroups).forEach(async ([gid, group]) => {
+            if (!this.bot) {
+              logger.error("机器人实例对象不存在！");
+              return;
+            }
+            await this.bot.sendGroup(parseInt(gid), [OneBotMessageUtils.Text(message)]);
+
+            logger.debug(`群聊通知完成✅ -> Group ${gid}`);
+          });
         });
       }
     });

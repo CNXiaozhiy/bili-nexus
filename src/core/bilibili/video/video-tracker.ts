@@ -9,6 +9,7 @@ export default class VideoTracker extends EventEmitter<{
   openStateChange: [OpenState: OpenState, lastOpenState: OpenState | null];
 
   open: [];
+  fail: [AuditState: AuditState, AegisState: AuditAegisState, problemDetail: VideoDetailAudit["problem_detail"]];
 }> {
   private logger;
   private biliApi;
@@ -18,7 +19,7 @@ export default class VideoTracker extends EventEmitter<{
   private lastAuditState: AuditState | null = null; // 主要状态
   private lastOpenState: OpenState | null = null;
 
-  constructor(private readonly name: string, private readonly biliAccount: BiliAccount, private readonly bvid: string) {
+  constructor(private readonly name: string, private readonly biliAccount: BiliAccount, private readonly bvid: string, private autoDestroy: boolean) {
     super();
     this.logger = getLogger("VideoTracker." + this.name);
     this.biliApi = biliAccount.getBiliApi();
@@ -53,6 +54,7 @@ export default class VideoTracker extends EventEmitter<{
         // 状态变化
         this.logger.debug(`state 变化: ${this.lastAuditState} -> ${auditDetail.state}`, auditDetail);
 
+        this.handleAuditStateChange(this.lastAuditState, auditDetail);
         this.emit("auditStateChange", auditDetail.state, this.lastAuditState, auditDetail);
 
         this.lastAuditState = auditDetail.state;
@@ -63,8 +65,6 @@ export default class VideoTracker extends EventEmitter<{
         // 状态变化
         this.logger.debug(`open_state 变化: ${this.lastOpenState} -> ${archiveDetail.open_state}`, archiveDetail);
 
-        if (archiveDetail.open_state === OpenState.OPENED) this.emit("open");
-
         this.emit("openStateChange", archiveDetail.open_state, this.lastOpenState);
 
         this.lastOpenState = archiveDetail.open_state;
@@ -73,6 +73,37 @@ export default class VideoTracker extends EventEmitter<{
       this.logger.error("跟踪视频失败:", error);
     } finally {
       setTimeout(() => this.pool(), 5000);
+    }
+  }
+
+  private handleAuditStateChange(lastAuditState: AuditState | null, detail: VideoDetailAudit) {
+    const newState = detail.state;
+
+    if (newState === AuditState.OPEN) {
+      this.logger.info("视频审核已通过, AuditState.Open");
+      this.emit("open");
+
+      if (this.autoDestroy) {
+        this.destroy();
+        this.logger.debug("Tracker 自动销毁成功");
+      }
+    } else if (
+      newState !== AuditState.SUBMITTED &&
+      newState !== AuditState.SCHEDULED &&
+      newState !== AuditState.DELAY &&
+      newState !== AuditState.PENDING &&
+      newState !== AuditState.TRANSCODING &&
+      newState !== AuditState.UNKNOWN_60
+    ) {
+      this.logger.warn("视频审核状态异常，未通过, AuditState: " + newState);
+      this.logger.debug("videoDetailAudit:", detail);
+
+      this.emit("fail", newState, detail.aegis_state, detail.problem_detail);
+
+      if (this.autoDestroy) {
+        this.destroy();
+        this.logger.debug("Tracker 自动销毁成功");
+      }
     }
   }
 
