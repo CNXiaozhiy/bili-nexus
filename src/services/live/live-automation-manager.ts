@@ -63,7 +63,7 @@ export interface LiveAutomationManagerEvents {
         liveEndRoomInfo: LiveRoomInfo;
         liveDuration: number;
         isFirst: false;
-      }
+      },
   ];
 }
 
@@ -549,7 +549,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
               clearTimeout(this.recordTimeouts.get(hash));
               this.recordTimeouts.delete(hash);
-            }, MAX_RECORD_TIMEOUT)
+            }, MAX_RECORD_TIMEOUT),
           );
           logger.debug(`已设置 ${hash} 的录制时长超时计时器`);
         }
@@ -736,7 +736,6 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
             logger.info(`房间 ${roomId} 自动投稿成功✅`, resp);
 
             resp.tracker.once("open", () => {
-
               try {
                 if (fs.existsSync(file)) {
                   fs.unlinkSync(file);
@@ -752,7 +751,6 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
             this.clearRecording(hash, false);
             logger.info(`录制器 ${hash} 生命已结束, 录制器已清理 🧹`);
-
           } catch (e) {
             logger.debug(`房间 ${roomId} 自动投稿失败❌, 已创建重投函数`);
             this.failedSubmission.set(hash, submissionFunc);
@@ -792,7 +790,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
                 duration: recorder.getStats().duration,
               },
               customOptions,
-            })
+            }),
         );
 
         this.clearRecording(hash, false);
@@ -851,7 +849,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       videoInfo: {
         title: customOptions?.title || title,
         desc: customOptions?.desc || desc,
-        cover: customOptions?.cover || roomInfo.keyframe || roomInfo.user_cover,
+        cover: customOptions?.cover || roomInfo.keyframe,
         tid: customOptions?.tid || 27,
         tag: customOptions?.tag,
         season: {
