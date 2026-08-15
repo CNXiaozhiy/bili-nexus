@@ -61,68 +61,41 @@
 
 查看：[QQ 机器人命令文档](../qq-bot/commands.md)
 
-## 🐳 Docker 一键部署（推荐）
-
-### Linux / macOS
+## 🐳 Docker 部署（推荐）
 
 ```bash
-# 使用官方一键部署脚本
-curl -fsSL https://raw.githubusercontent.com/cnxiaozhiy/bili-nexus/main/scripts/docker-deploy.sh | bash
+# 构建镜像（基于 pnpm workspace）
+docker build -t bili-nexus .
 
-# 或者下载后执行
-wget https://raw.githubusercontent.com/cnxiaozhiy/bili-nexus/main/scripts/docker-deploy.sh
-chmod +x docker-deploy.sh
-sudo ./docker-deploy.sh
+# 运行
+docker run -d \
+  --name bili-nexus \
+  --restart unless-stopped \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/recordings:/app/recordings \
+  -v $(pwd)/logs:/app/logs \
+  bili-nexus
 ```
 
 ### Windows Server
 
 ```powershell
-# 以管理员身份运行 PowerShell
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-# 执行一键部署脚本
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/cnxiaozhiy/bili-nexus/main/scripts/docker-deploy.ps1" -OutFile "docker-deploy.ps1"
-.\docker-deploy.ps1
+docker build -t bili-nexus .
+docker run -d --name bili-nexus --restart unless-stopped -v ${PWD}/config:/app/config -v ${PWD}/recordings:/app/recordings -v ${PWD}/logs:/app/logs bili-nexus
 ```
 
-## ⚙️ Node.js 一键部署
-
-### Linux / macOS
-
-```bash
-# 使用一键部署脚本
-curl -fsSL https://raw.githubusercontent.com/cnxiaozhiy/bili-nexus/main/scripts/node-deploy.sh | bash
-
-# 或者
-wget https://raw.githubusercontent.com/cnxiaozhiy/bili-nexus/main/scripts/node-deploy.sh
-chmod +x node-deploy.sh
-sudo ./node-deploy.sh
-```
-
-### Windows Server
-
-```powershell
-# 管理员权限运行
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-# 下载并执行
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/cnxiaozhiy/bili-nexus/main/scripts/node-deploy.ps1" -OutFile "node-deploy.ps1"
-.\node-deploy.ps1
-```
-
-### Node.js 手动部署
+## ⚙️ Node.js 部署
 
 ```bash
 # 1. 克隆项目
 git clone https://github.com/cnxiaozhiy/bili-nexus.git
 cd bili-nexus
 
-# 2. 安装依赖
-npm install
+# 2. 安装依赖（需 pnpm，可先 `npm install -g pnpm`）
+pnpm install
 
-# 3. 构建项目
-npm run build
+# 3. 构建项目（构建所有 workspace 包与应用）
+pnpm build
 
 # 4. 配置QQ机器人（推荐）
 # 编辑 config/qq-bot.json 配置机器人
@@ -316,8 +289,8 @@ cd /path/to/bili-nexus
 git pull
 
 # Node.js 更新
-npm install
-npm run build
+pnpm install
+pnpm build
 pm2 reload bili-nexus
 ```
 

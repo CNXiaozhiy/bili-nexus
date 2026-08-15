@@ -1,15 +1,26 @@
-import { appConfigManager, liveConfigManager, accountConfigManager, userDynamicConfigManager, qqBotConfigManager } from "@/common";
-import getLogger from "./utils/logger";
-import { initVersion, getVersion } from "./services/version";
-import Ffmpeg from "./core/ffmpeg";
-import { deleteFolderRecursive, isFolderEmpty } from "./utils/file";
-import LiveAutomationManager, { RoomManageOptions } from "./services/live/live-automation-manager";
-import BiliAccountService from "./services/account/bili-account-service";
-import UserAccount from "./core/bilibili/account";
-import { loginAccountByConsole } from "./core/bilibili/account-login";
-import QQBotService from "./services/qq-bot/qq-bot-service";
-import DynamicAutomationManager from "./services/dynamic/dynamic-automation-manager";
 import { existsSync, mkdirSync } from "fs";
+
+import {
+  accountConfigManager,
+  appConfigManager,
+  BiliAccountService,
+  deleteFolderRecursive,
+  DynamicAutomationManager,
+  Ffmpeg,
+  FormatUtils,
+  getLogger,
+  getVersion,
+  initVersion,
+  isFolderEmpty,
+  LiveAutomationManager,
+  liveConfigManager,
+  loginAccountByConsole,
+  notifyEmitter,
+  UserAccount,
+  userDynamicConfigManager,
+} from "@bili-nexus/core";
+import type { BiliAccount, BotAdapter, RoomManageOptions } from "@bili-nexus/core";
+import { QQBotService, qqBotConfigManager } from "@bili-nexus/qq-bot";
 
 const logger = getLogger("App");
 initVersion();
@@ -28,12 +39,31 @@ if (process.env.NODE_ENV === "development") logger.debug("当前处于 开发环
 else if (process.env.NODE_ENV === "production") logger.debug("当前处于 生产环境");
 else logger.error("无法识别当前工作环境，请检查环境NODE_ENV是否配置！");
 
+// 全局异常处理（尽早注册，避免初始化期异常丢失）
+process.on("uncaughtException", (error) => {
+  logger.error("uncaughtException", error);
+
+  const errorMessage = FormatUtils.formatErrorMessage("uncaughtException", error);
+  notifyEmitter.emit("msg-error", errorMessage, error);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  logger.error("unhandledRejection", reason);
+
+  const errorMessage = FormatUtils.formatErrorMessage("unhandledRejection", reason, promise);
+  notifyEmitter.emit("msg-error", errorMessage, reason);
+});
+
+/**
+ * 组合根（Composition Root）：
+ * 负责装配 core 领域服务与各平台适配器（BotAdapter 端口）。
+ */
 export class App {
   private liveAutomationManager: LiveAutomationManager | null = null;
   private dynamicAutomationManager: DynamicAutomationManager | null = null;
 
-  // 适配器
-  private qqBotService: QQBotService | null = null;
+  /** 已注册的平台适配器 */
+  private readonly adapters: BotAdapter[] = [];
 
   constructor() {}
 
@@ -99,7 +129,7 @@ export class App {
     } else {
       // 注册默认账号
       defaultBiliAccount = BiliAccountService.registerDefault(
-        new UserAccount(defaultAccount, accounts[defaultAccount].cookie, accounts[defaultAccount].refresh_token)
+        new UserAccount(defaultAccount, accounts[defaultAccount].cookie, accounts[defaultAccount].refresh_token),
       );
     }
 
@@ -121,16 +151,9 @@ export class App {
     this.dynamicAutomationManager = new DynamicAutomationManager(defaultBiliAccount);
     logger.info("DynamicAutomationManager 实例化完成✔️");
 
-    // 初始化 QQBotService
+    // 初始化平台适配器（BotAdapter 端口）
     if (qqBotConfigManager.get("enable")) {
-      this.qqBotService = new QQBotService(this.liveAutomationManager, this.dynamicAutomationManager);
-      try {
-        await this.qqBotService.init();
-        logger.info("QQBotService 初始化成功✔️");
-      } catch (e) {
-        logger.error("QQBotService 初始化失败❌", e);
-        process.exit(1);
-      }
+      await this.registerAdapter(new QQBotService(this.liveAutomationManager, this.dynamicAutomationManager));
     } else {
       logger.warn(`QQBotService 适配器 -> 已禁用🚫`);
     }
@@ -176,6 +199,24 @@ export class App {
     return;
   }
 
+  /** 注册并初始化一个平台适配器 */
+  private async registerAdapter(adapter: BotAdapter): Promise<void> {
+    try {
+      await adapter.init();
+      logger.info(`适配器 [${adapter.name}] 初始化成功✔️`);
+      this.adapters.push(adapter);
+    } catch (e) {
+      logger.error(`适配器 [${adapter.name}] 初始化失败❌`, e);
+      process.exit(1);
+    }
+  }
+
+  /** 优雅关闭所有已注册适配器 */
+  public async shutdown(): Promise<void> {
+    logger.info("正在关闭所有适配器...");
+    await Promise.allSettled(this.adapters.map((adapter) => adapter.shutdown()));
+  }
+
   public getLiveAutomationManager() {
     return this.liveAutomationManager;
   }
@@ -189,24 +230,16 @@ const app = new App();
 
 app.run().then(() => logger.info("App 启动成功✅"));
 
-import notifyEmitter from "./core/app/notify-emitter";
-import FormatUtils from "./utils/format";
-import { BiliAccount } from "./core/bilibili/bili-account";
+// 优雅退出
+const gracefulShutdown = (signal: string) => {
+  logger.info(`收到退出信号 ${signal}, 开始优雅关闭...`);
+  app
+    .shutdown()
+    .catch((e) => logger.error("优雅关闭失败", e))
+    .finally(() => process.exit(0));
+};
 
-if (true) {
-  process.on("uncaughtException", (error) => {
-    logger.error("uncaughtException", error);
-
-    const errorMessage = FormatUtils.formatErrorMessage("uncaughtException", error);
-    notifyEmitter.emit("msg-error", errorMessage, error);
-  });
-
-  process.on("unhandledRejection", (reason, promise) => {
-    logger.error("unhandledRejection", reason);
-
-    const errorMessage = FormatUtils.formatErrorMessage("unhandledRejection", reason, promise);
-    notifyEmitter.emit("msg-error", errorMessage, reason);
-  });
-}
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
 export default app;

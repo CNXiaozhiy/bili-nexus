@@ -1,6 +1,7 @@
 const packageJson = require("./package.json");
 
-const external = Object.keys(packageJson.dependencies || []);
+// npm 依赖保持 external；workspace 包（@bili-nexus/*）打包进产物
+const external = Object.keys(packageJson.dependencies || []).filter((d) => !d.startsWith("@bili-nexus/"));
 
 module.exports = {
   entry: {
@@ -19,4 +20,5 @@ module.exports = {
     ...external,
     "esbuild", // 消除警告
   ],
+  noExternal: ["@bili-nexus/core", "@bili-nexus/qq-bot"],
 };

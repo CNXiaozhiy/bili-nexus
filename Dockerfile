@@ -1,9 +1,11 @@
 FROM node:22-alpine AS builder
+RUN corepack enable && corepack prepare pnpm@11 --activate
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --no-audit --prefer-offline
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY packages ./packages
+RUN pnpm install --frozen-lockfile --no-audit
 COPY . .
-RUN npm run build
+RUN pnpm build
 
 FROM node:22-alpine
 WORKDIR /app
@@ -23,9 +25,10 @@ ENV FFMPEG_BIN="/usr/bin/ffmpeg"
 ENV CHROME_BIN="/usr/bin/chromium-browser"
 ENV TZ="Asia/Shanghai"
 
-COPY --from=builder /app/package.json /app/package-lock.json ./
+COPY --from=builder /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml ./
+COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/dist ./dist
 
-RUN npm ci --omit=dev --no-audit --prefer-offline
+RUN pnpm install --prod --frozen-lockfile --no-audit
 
 CMD ["node", "dist/app"]

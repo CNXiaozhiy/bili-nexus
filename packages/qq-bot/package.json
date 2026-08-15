@@ -1,0 +1,27 @@
+{
+  "name": "@bili-nexus/qq-bot",
+  "version": "1.2.15",
+  "description": "BiliNexus QQ bot adapter: OneBot v11 WebSocket client, commands and notification handlers",
+  "license": "Apache-2.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bili-nexus/core": "workspace:*",
+    "axios": "^1.8.4",
+    "uuid": "^11.0.5",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/ws": "^8.18.1",
+    "tsup": "^8.5.1",
+    "typescript": "^5.0.0"
+  }
+}

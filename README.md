@@ -21,6 +21,35 @@ _Automate, Monitor, Control — Your All-in-One Bilibili Live Solution._
 
 **BiliNexus** 是一个基于 TypeScript/Node.js 开发的 B 站直播全自动管理平台。采用模块化设计和容器化部署，提供一站式的直播录制、监控、管理和自动化投稿解决方案。
 
+## 🏗️ 项目结构（Monorepo）
+
+项目采用 **pnpm workspace** 管理，领域层与平台适配器完全解耦：
+
+```
+bili-nexus/
+├── src/
+│   └── app.ts                 # 组合根（Composition Root）：装配领域服务与平台适配器
+├── packages/
+│   ├── core/                  # @bili-nexus/core — 领域层与基础设施
+│   │   └── src/
+│   │       ├── common/        # 配置管理器（app/bili/account/live/dynamic/api/web）
+│   │       ├── core/          # bilibili 领域、ffmpeg、磁盘监控、事件总线
+│   │       ├── services/      # Live/Dynamic/Account 自动化服务
+│   │       ├── interfaces/    # BotAdapter 端口（适配器抽象）
+│   │       ├── types/         # 领域类型与错误
+│   │       └── utils/         # logger/config/format/request 等基础设施
+│   └── qq-bot/                # @bili-nexus/qq-bot — QQ 机器人适配器（独立包）
+│       └── src/
+│           ├── client/        # OneBot v11 WebSocket 客户端
+│           ├── command/       # 命令解析框架
+│           ├── config/        # qq-bot.json 配置（自持，与 core 解耦）
+│           ├── service/       # 命令 / 通知 / 模板 / 订阅分层
+│           └── types/         # OneBot 协议类型与错误
+└── tsconfig.base.json         # 共享 TypeScript 配置
+```
+
+**依赖方向约定**：`core` 不依赖任何具体平台；`qq-bot` 依赖 `core` 并实现其 `BotAdapter` 端口。新增平台（Telegram / Web 等）只需实现 `BotAdapter` 并在 `app.ts` 中注册。
+
 ## 📋 部署建议
 
 **本项目为服务器级应用，建议在具备以下条件的长期运行服务器上部署：**
