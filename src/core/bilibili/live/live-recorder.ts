@@ -438,7 +438,7 @@ export default class LiveRecorder extends EventEmitter<LiveRecorderEvents> {
   public generateNewFilePath(index: number | string, timestamp = Date.now()) {
     this._checkIfDestroyed();
 
-    return `${this.recordingDir}/${timestamp}-${this.sessionHash.substring(0, 16)}-${this.hash.substring(0, 32)}_${index}.flv`;
+    return `${this.recordingDir}/${timestamp}-${this.sessionHash.substring(0, 16)}-${this.hash.substring(0, 32)}_${index}.ts`;
   }
 
   /**

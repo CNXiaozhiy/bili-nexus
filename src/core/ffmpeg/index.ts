@@ -478,7 +478,7 @@ export default class Ffmpeg {
       "-c:a",
       options.audioCodec || "copy",
       "-f",
-      options.format || "flv"
+      options.format || "mpegts"
     );
 
     if (options.quality) args.push("-q:v", options.quality);
