@@ -419,8 +419,13 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
               .getLiveRoomInfo(roomId)
               .then((roomInfo) => {
                 if (roomInfo.live_status !== LiveRoomStatus.LIVE) {
-                  logger.warn(`manualPoll -> 房间 ${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`);
-                  notifyEmitter.emit("msg-error", `[manualPoll]\n房间 ${roomId} -> manualPoll 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`);
+                  logger.warn(
+                    `manualPoll -> 房间 ${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`,
+                  );
+                  notifyEmitter.emit(
+                    "msg-error",
+                    `[manualPoll]\n房间 ${roomId} -> manualPoll 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`,
+                  );
                   return;
                 }
 
@@ -453,8 +458,20 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
               .getLiveRoomInfo(roomId)
               .then((roomInfo) => {
                 if (roomInfo.live_status === LiveRoomStatus.LIVE) {
-                  logger.warn(`manualPoll -> 房间 ${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`);
-                  notifyEmitter.emit("msg-error", `[manualPoll]\n房间 ${roomId} -> manualPoll 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`);
+                  logger.warn(
+                    `manualPoll -> 房间 ${roomId} -> 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`,
+                  );
+                  notifyEmitter.emit(
+                    "msg-error",
+                    `[manualPoll]\n房间 ${roomId} -> manualPoll 直播状态不同步, Client: ${LiveRoomStatus.LIVE}, API: ${roomInfo.live_status}, 触发直播通知流程中断`,
+                  );
+                  return;
+                }
+
+                // 获取本次直播Hash
+                const hash = this.roomIdToHashMap.get(roomId) || null;
+                if (!hash) {
+                  logger.error(`漏触发处理时无法找到 ${roomId} 的当前Hash`);
                   return;
                 }
 
@@ -467,7 +484,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
                 }
 
                 this.handleLiveEnd({
-                  hash: null,
+                  hash,
                   roomId,
                   liveEndRoomInfo: roomInfo,
                   roomManageOptions,
@@ -488,7 +505,11 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
       });
   }
 
-  private async handleLiveStart({ hash, sessionHash }: { hash: string; sessionHash: string }, roomInfo: LiveRoomInfo, roomManageOptions: RoomManageOptions) {
+  private async handleLiveStart(
+    { hash, sessionHash }: { hash: string; sessionHash: string },
+    roomInfo: LiveRoomInfo,
+    roomManageOptions: RoomManageOptions,
+  ) {
     const roomId = roomInfo.room_id;
 
     this.hashToRoomInfoMap.set(hash, {
