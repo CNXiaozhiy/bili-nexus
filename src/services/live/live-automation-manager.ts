@@ -470,7 +470,7 @@ export default class LiveAutomationManager extends EventEmitter<LiveAutomationMa
 
                 // 获取本次直播Hash
                 const hash = this.roomIdToHashMap.get(roomId) || null;
-                if (!hash) {
+                if (this.firstFlagMap.has(roomId) && !hash) {
                   logger.error(`漏触发处理时无法找到 ${roomId} 的当前Hash`);
                   return;
                 }
